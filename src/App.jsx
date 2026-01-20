@@ -49,7 +49,7 @@ function WelcomeScreen({ onComplete }) {
 
   return (
     <div 
-      className={`fixed inset-0 bg-gradient-to-br from-amber-50 via-rose-50 to-orange-50 flex flex-col items-center justify-center z-50 transition-opacity duration-800 ${fadeOut ? 'opacity-0' : 'opacity-100'}`}
+      className={`fixed inset-0 bg-orange-50 flex flex-col items-center justify-center z-50 transition-opacity duration-800 ${fadeOut ? 'opacity-0' : 'opacity-100'}`}
     >
       <div className="flex flex-col items-center space-y-6">
         <img 
@@ -184,9 +184,9 @@ function CoastalKilnApp() {
   }
 
   return (
-    <div className="min-h-screen max-h-screen overflow-y-auto bg-gradient-to-br from-slate-50 to-orange-50">
+    <div className="min-h-screen max-h-screen overflow-y-auto bg-slate-50">
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-gradient-to-br from-slate-50 to-orange-50">
+      <header className="sticky top-0 z-40 bg-slate-50">
         <div className="max-w-7xl mx-auto px-4 h-16 flex justify-end items-center">
           <button onClick={() => { setShowSettings(true); setSettingsView('main'); }} className="p-2 text-slate-600 hover:bg-white/50 rounded-lg">
             <Settings size={20} />
@@ -288,11 +288,11 @@ function CoastalKilnApp() {
               <h1 className="text-5xl font-normal text-slate-900 mb-6">Sustainable Studio</h1>
               
               <div className="grid grid-cols-2 gap-3">
-                <button onClick={() => setSustainableTab('reclaim')} className={`p-6 rounded-2xl text-left transition-all ${sustainableTab === 'reclaim' ? 'bg-gradient-to-br from-green-100 to-orange-100 shadow-md' : 'bg-white shadow-sm'}`}>
+                <button onClick={() => setSustainableTab('reclaim')} className={`p-6 rounded-2xl text-left transition-all ${sustainableTab === 'reclaim' ? 'bg-green-100 shadow-md' : 'bg-white shadow-sm'}`}>
                   <h3 className="font-semibold text-slate-800 text-lg">Clay Reclaim</h3>
                 </button>
                 
-                <button onClick={() => setSustainableTab('tips')} className={`p-6 rounded-2xl text-left transition-all ${sustainableTab === 'tips' ? 'bg-gradient-to-br from-amber-100 to-orange-100 shadow-md' : 'bg-white shadow-sm'}`}>
+                <button onClick={() => setSustainableTab('tips')} className={`p-6 rounded-2xl text-left transition-all ${sustainableTab === 'tips' ? 'bg-amber-100 shadow-md' : 'bg-white shadow-sm'}`}>
                   <h3 className="font-semibold text-slate-800 text-lg">Studio Tips</h3>
                 </button>
               </div>
@@ -300,7 +300,7 @@ function CoastalKilnApp() {
 
             {sustainableTab === 'reclaim' ? (
               <div className="space-y-4">
-                <div className="bg-gradient-to-br from-green-50 to-orange-50 rounded-lg p-6 shadow-sm">
+                <div className="bg-green-50 rounded-lg p-6 shadow-sm">
                   <h3 className="text-lg font-semibold text-green-900 mb-2">Total Reclaimed</h3>
                   <p className="text-4xl font-bold text-green-700">
                     {reclaimBatches.filter(b => b.weight).reduce((sum, b) => sum + b.weight, 0).toFixed(1)} kg
@@ -327,7 +327,7 @@ function CoastalKilnApp() {
                 </div>
 
                 {reclaimBatches.length === 0 && (
-                  <div className="text-center py-12 bg-gradient-to-br from-amber-50 via-rose-50 to-orange-50 rounded-lg shadow-sm">
+                  <div className="text-center py-12 bg-orange-50 rounded-lg shadow-sm">
                     <Leaf size={48} className="mx-auto text-slate-400 mb-3" />
                     <h3 className="text-lg font-medium text-slate-700 mb-1">No reclaim batches yet</h3>
                     <p className="text-slate-500">Start tracking your clay reclaim</p>
@@ -342,7 +342,7 @@ function CoastalKilnApp() {
 
                   return (
                     <div key={category} className="bg-white rounded-lg overflow-hidden shadow-sm">
-                      <button onClick={() => setExpandedTips(p => ({ ...p, [category]: !p[category] }))} className="w-full flex items-center justify-between p-4 hover:bg-gradient-to-br from-amber-50 via-rose-50 to-orange-50 transition-colors">
+                      <button onClick={() => setExpandedTips(p => ({ ...p, [category]: !p[category] }))} className="w-full flex items-center justify-between p-4 hover:bg-orange-50 transition-colors">
                         <h3 className="font-semibold text-slate-800">{categoryLabels[category]}</h3>
                         {expandedTips[category] ? <ChevronUp size={20} className="text-slate-400" /> : <ChevronDown size={20} className="text-slate-400" />}
                       </button>
@@ -350,7 +350,7 @@ function CoastalKilnApp() {
                       {expandedTips[category] && (
                         <div className="p-4 pt-0 space-y-3">
                           {categoryTips.map(tip => (
-                            <div key={tip.id} className="bg-gradient-to-br from-amber-50 via-rose-50 to-orange-50 rounded-lg p-4">
+                            <div key={tip.id} className="bg-orange-50 rounded-lg p-4">
                               <h4 className="font-medium text-slate-800 mb-2">{tip.title}</h4>
                               <p className="text-sm text-slate-700 mb-3">{tip.content}</p>
                               <div className="flex flex-wrap gap-2">
@@ -388,7 +388,7 @@ function CoastalKilnApp() {
               <p className="text-slate-700 mb-4">{selectedGuild.description}</p>
               
               {selectedGuild.isAdmin && (
-                <div className="bg-gradient-to-br from-amber-50 via-rose-50 to-orange-50 rounded-lg p-4">
+                <div className="bg-orange-50 rounded-lg p-4">
                   <p className="text-sm font-medium text-slate-800 mb-1">Invite Code</p>
                   <div className="flex items-center gap-2">
                     <code className="px-3 py-2 bg-white border border-slate-300 rounded text-lg font-mono font-bold text-slate-800 flex-1 text-center shadow-sm">
@@ -420,8 +420,8 @@ function CoastalKilnApp() {
                 <h3 className="font-semibold text-slate-800 mb-3">Members ({selectedGuild.members})</h3>
                 <div className="space-y-2">
                   {selectedGuild.memberList.map((member, idx) => (
-                    <div key={idx} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gradient-to-br from-amber-50 via-rose-50 to-orange-50">
-                      <div className="w-10 h-10 bg-gradient-to-br from-orange-400 to-amber-500 rounded-full flex items-center justify-center text-white font-semibold">
+                    <div key={idx} className="flex items-center gap-3 p-2 rounded-lg hover:bg-orange-50">
+                      <div className="w-10 h-10 bg-orange-500 rounded-full flex items-center justify-center text-white font-semibold">
                         {member[0]}
                       </div>
                       <span className="text-slate-800">{member}</span>
@@ -439,7 +439,7 @@ function CoastalKilnApp() {
               {selectedGuild.posts && selectedGuild.posts.length > 0 ? (
                 <div className="space-y-3 mb-4">
                   {selectedGuild.posts.map(post => (
-                    <div key={post.id} className="bg-gradient-to-br from-amber-50 via-rose-50 to-orange-50 rounded-lg p-4">
+                    <div key={post.id} className="bg-orange-50 rounded-lg p-4">
                       <div className="flex items-start justify-between mb-2">
                         <span className="font-medium text-slate-800">{post.author}</span>
                         <span className="text-xs text-slate-500">{post.time}</span>
@@ -466,7 +466,7 @@ function CoastalKilnApp() {
               {selectedGuild.resources && selectedGuild.resources.length > 0 ? (
                 <div className="space-y-2 mb-4">
                   {selectedGuild.resources.map(resource => (
-                    <div key={resource.id} className="flex items-center justify-between p-3 bg-gradient-to-br from-amber-50 via-rose-50 to-orange-50 rounded-lg">
+                    <div key={resource.id} className="flex items-center justify-between p-3 bg-orange-50 rounded-lg">
                       <div>
                         <p className="font-medium text-slate-800 text-sm">{resource.title}</p>
                         <p className="text-xs text-slate-600">Added by {resource.addedBy}</p>
@@ -492,11 +492,11 @@ function CoastalKilnApp() {
               <h1 className="text-5xl font-normal text-slate-900 mb-6">My Guilds</h1>
               
               <div className="grid grid-cols-2 gap-3">
-                <button onClick={() => setGuildTab('my-guilds')} className={`p-6 rounded-2xl text-left transition-all ${guildTab === 'my-guilds' ? 'bg-gradient-to-br from-orange-100 to-amber-100 shadow-md' : 'bg-white shadow-sm'}`}>
+                <button onClick={() => setGuildTab('my-guilds')} className={`p-6 rounded-2xl text-left transition-all ${guildTab === 'my-guilds' ? 'bg-orange-100 shadow-md' : 'bg-white shadow-sm'}`}>
                   <h3 className="font-semibold text-slate-800 text-lg">My Guilds</h3>
                 </button>
                 
-                <button onClick={() => setGuildTab('discover')} className={`p-6 rounded-2xl text-left transition-all ${guildTab === 'discover' ? 'bg-gradient-to-br from-blue-100 to-orange-100 shadow-md' : 'bg-white shadow-sm'}`}>
+                <button onClick={() => setGuildTab('discover')} className={`p-6 rounded-2xl text-left transition-all ${guildTab === 'discover' ? 'bg-blue-100 shadow-md' : 'bg-white shadow-sm'}`}>
                   <h3 className="font-semibold text-slate-800 text-lg">Discover</h3>
                 </button>
               </div>
@@ -529,7 +529,7 @@ function CoastalKilnApp() {
                   </button>
                 ))}
                 {guilds.filter(g => g.isMember).length === 0 && (
-                  <div className="text-center py-12 bg-gradient-to-br from-amber-50 via-rose-50 to-orange-50 rounded-lg shadow-sm">
+                  <div className="text-center py-12 bg-orange-50 rounded-lg shadow-sm">
                     <Users size={48} className="mx-auto text-slate-400 mb-3" />
                     <h3 className="text-lg font-medium text-slate-700 mb-1">No guilds yet</h3>
                     <p className="text-slate-500">Create or join a local pottery guild</p>
@@ -538,7 +538,7 @@ function CoastalKilnApp() {
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-lg p-6 shadow-sm">
+                <div className="bg-orange-50 rounded-lg p-6 shadow-sm">
                   <h3 className="font-semibold text-slate-800 mb-3">Have an Invite Code?</h3>
                   <button onClick={() => setShowModal(true)} className="w-full px-4 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-medium">
                     Join by Invite Code
@@ -580,14 +580,14 @@ function CoastalKilnApp() {
               <h1 className="text-5xl font-normal text-slate-900 mb-6">What are we making today?</h1>
               
               <div className="grid grid-cols-2 gap-3">
-                <button onClick={() => setTab('pieces')} className={`p-6 rounded-2xl text-left transition-all ${tab === 'pieces' ? 'bg-gradient-to-br from-amber-100 to-orange-100 shadow-md' : 'bg-white shadow-sm'}`}>
+                <button onClick={() => setTab('pieces')} className={`p-6 rounded-2xl text-left transition-all ${tab === 'pieces' ? 'bg-amber-100 shadow-md' : 'bg-white shadow-sm'}`}>
                   <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center mb-3">
                     <Flame size={22} className={tab === 'pieces' ? 'text-orange-600' : 'text-slate-600'} />
                   </div>
                   <h3 className="font-semibold text-slate-800 text-lg">Pieces</h3>
                 </button>
                 
-                <button onClick={() => setTab('glazes')} className={`p-6 rounded-2xl text-left transition-all ${tab === 'glazes' ? 'bg-gradient-to-br from-blue-100 to-orange-100 shadow-md' : 'bg-white shadow-sm'}`}>
+                <button onClick={() => setTab('glazes')} className={`p-6 rounded-2xl text-left transition-all ${tab === 'glazes' ? 'bg-blue-100 shadow-md' : 'bg-white shadow-sm'}`}>
                   <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center mb-3">
                     <Palette size={22} className={tab === 'glazes' ? 'text-orange-600' : 'text-slate-600'} />
                   </div>
@@ -612,7 +612,7 @@ function CoastalKilnApp() {
                   </button>
                 ))}
                 {projects.length === 0 && (
-                  <div className="col-span-2 text-center py-12 bg-gradient-to-br from-amber-50 via-rose-50 to-orange-50 rounded-lg shadow-sm">
+                  <div className="col-span-2 text-center py-12 bg-orange-50 rounded-lg shadow-sm">
                     <Flame size={48} className="mx-auto text-slate-400 mb-3" />
                     <p className="text-slate-500">No pieces yet</p>
                   </div>
@@ -709,7 +709,7 @@ function CoastalKilnApp() {
             
             <div className="bg-white rounded-lg border border-slate-200 p-6">
               <h3 className="font-semibold text-slate-800 mb-3">Recipe</h3>
-              <pre className="text-sm text-slate-700 whitespace-pre-wrap font-mono bg-gradient-to-br from-amber-50 via-rose-50 to-orange-50 p-4 rounded-lg">{selected.recipe || 'No recipe'}</pre>
+              <pre className="text-sm text-slate-700 whitespace-pre-wrap font-mono bg-orange-50 p-4 rounded-lg">{selected.recipe || 'No recipe'}</pre>
             </div>
             
             <div className="bg-white rounded-lg border border-slate-200 p-6">
@@ -981,9 +981,9 @@ function CoastalKilnApp() {
                 </div>
                 <div className="overflow-y-auto max-h-[calc(90vh-80px)]">
                   <div className="p-6 space-y-2">
-                    <button onClick={() => setSettingsView('profile')} className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-orange-50 to-amber-50 rounded-2xl hover:from-orange-100 hover:to-amber-100 transition-all">
+                    <button onClick={() => setSettingsView('profile')} className="w-full flex items-center justify-between p-4 bg-orange-100 rounded-2xl hover:from-orange-100 hover:to-amber-100 transition-all">
                       <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 bg-gradient-to-br from-orange-400 to-amber-500 rounded-full flex items-center justify-center text-white text-xl font-bold shadow-md">
+                        <div className="w-12 h-12 bg-orange-500 rounded-full flex items-center justify-center text-white text-xl font-bold shadow-md">
                           {user.username[0]}
                         </div>
                         <span className="font-semibold text-slate-800">Your Profile</span>
@@ -1018,7 +1018,7 @@ function CoastalKilnApp() {
                 </div>
                 <div className="p-6 space-y-4">
                   <div className="flex flex-col items-center mb-4">
-                    <div className="w-24 h-24 bg-gradient-to-br from-orange-400 to-amber-500 rounded-full flex items-center justify-center text-white text-4xl font-bold mb-3 shadow-lg">
+                    <div className="w-24 h-24 bg-orange-500 rounded-full flex items-center justify-center text-white text-4xl font-bold mb-3 shadow-lg">
                       {user.username[0]}
                     </div>
                   </div>
@@ -1038,7 +1038,7 @@ function CoastalKilnApp() {
                     <label className="block text-sm font-semibold text-slate-700 mb-2">Location</label>
                     <input type="text" value={user.location} onChange={(e) => setUser({ ...user, location: e.target.value })} placeholder="Location" className="w-full px-4 py-3 border border-orange-200 rounded-xl focus:ring-2 focus:ring-orange-300 focus:border-transparent" />
                   </div>
-                  <button onClick={() => setSettingsView('main')} className="w-full px-4 py-3 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-xl font-semibold shadow-md">Save Changes</button>
+                  <button onClick={() => setSettingsView('main')} className="w-full px-4 py-3 bg-orange-600 text-white rounded-xl font-semibold shadow-md">Save Changes</button>
                 </div>
               </>
             ) : settingsView === 'preferences' ? (
@@ -1057,7 +1057,7 @@ function CoastalKilnApp() {
                       <option value="imperial">Imperial (lbs, inches)</option>
                     </select>
                   </div>
-                  <button onClick={() => setSettingsView('main')} className="w-full px-4 py-3 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-xl font-semibold shadow-md">Save Preferences</button>
+                  <button onClick={() => setSettingsView('main')} className="w-full px-4 py-3 bg-orange-600 text-white rounded-xl font-semibold shadow-md">Save Preferences</button>
                 </div>
               </>
             ) : settingsView === 'feedback' ? (
@@ -1080,7 +1080,7 @@ function CoastalKilnApp() {
                       setForm({ ...form, feedback: '' });
                       setSettingsView('main');
                     }
-                  }} disabled={!form.feedback.trim()} className="w-full px-4 py-3 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-xl font-semibold shadow-md disabled:from-slate-300 disabled:to-slate-300">
+                  }} disabled={!form.feedback.trim()} className="w-full px-4 py-3 bg-orange-600 text-white rounded-xl font-semibold shadow-md disabled:from-slate-300 disabled:to-slate-300">
                     Submit Feedback
                   </button>
                 </div>
