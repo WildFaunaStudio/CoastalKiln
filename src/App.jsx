@@ -194,7 +194,7 @@ function CoastalKilnApp() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 py-6 pb-24">
+      <main className="max-w-7xl mx-auto px-4 py-6 pb-32">
         {currentView === 'sustainable' && selectedBatch ? (
           /* Batch Detail View */
           <div className="space-y-4">
@@ -284,18 +284,18 @@ function CoastalKilnApp() {
         ) : currentView === 'sustainable' ? (
           /* Sustainable Studio View */
           <div className="space-y-6">
-            <div className="bg-white rounded-lg p-6 shadow-sm">
-              <h1 className="text-3xl font-bold text-slate-800 mb-1">Sustainable Studio</h1>
-              <p className="text-lg text-slate-600">Track reclaim, reduce waste, save resources</p>
-            </div>
-
-            <div className="flex gap-2 border-b border-slate-200">
-              <button onClick={() => setSustainableTab('reclaim')} className={`px-4 py-2.5 font-medium border-b-2 transition-colors ${sustainableTab === 'reclaim' ? 'border-orange-600 text-orange-700' : 'border-transparent text-slate-600'}`}>
-                Clay Reclaim
-              </button>
-              <button onClick={() => setSustainableTab('tips')} className={`px-4 py-2.5 font-medium border-b-2 transition-colors ${sustainableTab === 'tips' ? 'border-orange-600 text-orange-700' : 'border-transparent text-slate-600'}`}>
-                Studio Tips
-              </button>
+            <div className="px-2">
+              <h1 className="text-5xl font-normal text-slate-900 mb-6">Sustainable Studio</h1>
+              
+              <div className="grid grid-cols-2 gap-3">
+                <button onClick={() => setSustainableTab('reclaim')} className={`p-6 rounded-2xl text-left transition-all ${sustainableTab === 'reclaim' ? 'bg-gradient-to-br from-green-100 to-orange-100 shadow-md' : 'bg-white shadow-sm'}`}>
+                  <h3 className="font-semibold text-slate-800 text-lg">Clay Reclaim</h3>
+                </button>
+                
+                <button onClick={() => setSustainableTab('tips')} className={`p-6 rounded-2xl text-left transition-all ${sustainableTab === 'tips' ? 'bg-gradient-to-br from-amber-100 to-orange-100 shadow-md' : 'bg-white shadow-sm'}`}>
+                  <h3 className="font-semibold text-slate-800 text-lg">Studio Tips</h3>
+                </button>
+              </div>
             </div>
 
             {sustainableTab === 'reclaim' ? (
@@ -488,18 +488,18 @@ function CoastalKilnApp() {
         ) : currentView === 'guilds' ? (
           /* Guilds List View */
           <div className="space-y-6">
-            <div className="bg-white rounded-lg p-6 shadow-sm">
-              <h1 className="text-3xl font-bold text-slate-800 mb-1">My Guilds</h1>
-              <p className="text-lg text-slate-600">Connect with local pottery communities</p>
-            </div>
-
-            <div className="flex gap-2 border-b border-slate-200">
-              <button onClick={() => setGuildTab('my-guilds')} className={`px-4 py-2.5 font-medium border-b-2 transition-colors ${guildTab === 'my-guilds' ? 'border-orange-600 text-orange-700' : 'border-transparent text-slate-600'}`}>
-                My Guilds
-              </button>
-              <button onClick={() => setGuildTab('discover')} className={`px-4 py-2.5 font-medium border-b-2 transition-colors ${guildTab === 'discover' ? 'border-orange-600 text-orange-700' : 'border-transparent text-slate-600'}`}>
-                Discover
-              </button>
+            <div className="px-2">
+              <h1 className="text-5xl font-normal text-slate-900 mb-6">My Guilds</h1>
+              
+              <div className="grid grid-cols-2 gap-3">
+                <button onClick={() => setGuildTab('my-guilds')} className={`p-6 rounded-2xl text-left transition-all ${guildTab === 'my-guilds' ? 'bg-gradient-to-br from-orange-100 to-amber-100 shadow-md' : 'bg-white shadow-sm'}`}>
+                  <h3 className="font-semibold text-slate-800 text-lg">My Guilds</h3>
+                </button>
+                
+                <button onClick={() => setGuildTab('discover')} className={`p-6 rounded-2xl text-left transition-all ${guildTab === 'discover' ? 'bg-gradient-to-br from-blue-100 to-orange-100 shadow-md' : 'bg-white shadow-sm'}`}>
+                  <h3 className="font-semibold text-slate-800 text-lg">Discover</h3>
+                </button>
+              </div>
             </div>
 
             {guildTab === 'my-guilds' ? (
