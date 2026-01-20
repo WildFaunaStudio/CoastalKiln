@@ -184,7 +184,7 @@ function CoastalKilnApp() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-orange-50 pb-20">
+    <div className="min-h-screen max-h-screen overflow-y-auto bg-gradient-to-br from-slate-50 to-orange-50">
       {/* Header */}
       <header className="sticky top-0 z-40 bg-gradient-to-br from-slate-50 to-orange-50">
         <div className="max-w-7xl mx-auto px-4 h-16 flex justify-end items-center">
@@ -194,7 +194,7 @@ function CoastalKilnApp() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 py-6">
+      <main className="max-w-7xl mx-auto px-4 py-6 pb-24">
         {currentView === 'sustainable' && selectedBatch ? (
           /* Batch Detail View */
           <div className="space-y-4">
