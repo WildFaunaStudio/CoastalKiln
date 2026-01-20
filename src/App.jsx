@@ -28,7 +28,49 @@ const storage = {
   }
 };
 
+// Welcome Screen Component
+function WelcomeScreen({ onComplete }) {
+  const [fadeOut, setFadeOut] = useState(false);
+
+  useEffect(() => {
+    const fadeTimer = setTimeout(() => {
+      setFadeOut(true);
+    }, 2000);
+
+    const completeTimer = setTimeout(() => {
+      onComplete();
+    }, 2800);
+
+    return () => {
+      clearTimeout(fadeTimer);
+      clearTimeout(completeTimer);
+    };
+  }, [onComplete]);
+
+  return (
+    <div 
+      className={`fixed inset-0 bg-gradient-to-br from-amber-50 via-rose-50 to-orange-50 flex flex-col items-center justify-center z-50 transition-opacity duration-800 ${fadeOut ? 'opacity-0' : 'opacity-100'}`}
+    >
+      <div className="flex flex-col items-center space-y-6">
+        <img 
+          src="/CoastalKilnLogo.png" 
+          alt="Coastal Kiln" 
+          className="w-48 h-48 animate-pulse"
+          style={{ animationDuration: '2s' }}
+        />
+        <h1 className="text-3xl font-bold text-slate-800">Coastal Kiln</h1>
+        <div className="flex space-x-2">
+          <div className="w-2 h-2 bg-orange-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+          <div className="w-2 h-2 bg-orange-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+          <div className="w-2 h-2 bg-orange-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function CoastalKilnApp() {
+  const [showWelcome, setShowWelcome] = useState(true);
   const [user, setUser] = useState(() => storage.get('user', { username: 'Daniel', email: 'potter@coastalkiln.com', bio: 'Potter & ceramic artist', location: 'Wellington, NZ', units: 'metric' }));
   const [currentView, setCurrentView] = useState('studio');
   const [tab, setTab] = useState('pieces');
@@ -136,18 +178,16 @@ function CoastalKilnApp() {
     }
   };
 
+  // Show welcome screen
+  if (showWelcome) {
+    return <WelcomeScreen onComplete={() => setShowWelcome(false)} />;
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-orange-50 pb-20">
       {/* Header */}
       <header className="sticky top-0 z-40 bg-gradient-to-br from-slate-50 to-orange-50">
-        <div className="max-w-7xl mx-auto px-4 h-16 flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-cyan-600 rounded-lg flex items-center justify-center text-2xl">🌊</div>
-            <div>
-              <h1 className="text-lg font-bold text-slate-800">Coastal Kiln</h1>
-              <p className="text-xs text-slate-500 hidden sm:block">Your Pottery Companion</p>
-            </div>
-          </div>
+        <div className="max-w-7xl mx-auto px-4 h-16 flex justify-end items-center">
           <button onClick={() => { setShowSettings(true); setSettingsView('main'); }} className="p-2 text-slate-600 hover:bg-white/50 rounded-lg">
             <Settings size={20} />
           </button>
