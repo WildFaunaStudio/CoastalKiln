@@ -1,23 +1,22 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Plus, Home, Settings, Flame, Palette, ArrowLeft, Camera, CheckCircle, Trash2, X, Leaf, ChevronDown, ChevronUp, Users, MessageSquare, Calendar, BookOpen, Send, ChevronRight, LogOut } from 'lucide-react';
-import WelcomeScreen from './components/WelcomeScreen';
 import AuthScreen from './pages/AuthScreen';
 import { useAuth } from './contexts/AuthContext';
 import { projects as projectsApi } from './lib/api/projects';
+import { glazes as glazesApi } from './lib/api/glazes';
 import { isSupabaseConfigured } from './lib/supabase';
 import storage from './utils/storage';
 
 function CoastalKilnApp() {
-  const { profile, loading: authLoading, isAuthenticated, isOnline, signIn, signUp, signOut, resetPassword, updateProfile } = useAuth();
+  const { user, profile, loading: authLoading, isAuthenticated, isOnline, signIn, signUp, signOut, resetPassword, updateProfile } = useAuth();
 
-  const [showWelcome, setShowWelcome] = useState(true);
   const [offlineMode, setOfflineMode] = useState(false);
 
   // Use profile from auth context, fallback to default for offline mode
-  const user = profile || { username: 'Potter', email: '', bio: '', location: '', units: 'metric' };
-  const setUser = (updates) => {
+  const displayProfile = profile || { username: 'Potter', email: '', bio: '', location: '', units: 'metric' };
+  const setDisplayProfile = (updates) => {
     if (typeof updates === 'function') {
-      updateProfile(updates(user));
+      updateProfile(updates(displayProfile));
     } else {
       updateProfile(updates);
     }
@@ -27,6 +26,7 @@ function CoastalKilnApp() {
   const [sustainableTab, setSustainableTab] = useState('reclaim');
   const [guildTab, setGuildTab] = useState('my-guilds');
   const [showModal, setShowModal] = useState(false);
+  const [modalType, setModalType] = useState(null); // 'post' | 'resource' | null
   const [showSettings, setShowSettings] = useState(false);
   const [settingsView, setSettingsView] = useState('main');
   const [selected, setSelected] = useState(null);
@@ -36,9 +36,8 @@ function CoastalKilnApp() {
   const [projects, setProjects] = useState([]);
   const [projectsLoading, setProjectsLoading] = useState(true);
 
-  const [glazes, setGlazes] = useState(() => storage.get('glazes', [
-    { id: '1', name: 'Leach Blue', type: 'Cone 6', recipe: 'Nepheline Syenite 40%\nSilica 25%', notes: '', tiles: [] }
-  ]));
+  const [glazes, setGlazes] = useState([]);
+  const [glazesLoading, setGlazesLoading] = useState(true);
 
   const [reclaimBatches, setReclaimBatches] = useState(() => storage.get('reclaimBatches', [
     { id: '1', weight: 5.5, source: 'Trimming scraps', date: '2026-01-10', status: 'drying', notes: 'Mixed porcelain and stoneware' }
@@ -95,20 +94,68 @@ function CoastalKilnApp() {
     loadProjects();
   }, [isAuthenticated, offlineMode]);
 
+  // Load glazes from Supabase when authenticated
+  useEffect(() => {
+    const loadGlazes = async () => {
+      if (!isAuthenticated) {
+        setGlazesLoading(false);
+        return;
+      }
+
+      if (isSupabaseConfigured() && !offlineMode) {
+        try {
+          setGlazesLoading(true);
+          const data = await glazesApi.list();
+          // Transform Supabase data to match app format
+          const transformed = data.map(g => ({
+            id: g.id,
+            name: g.name,
+            type: g.firing_type,
+            recipe: g.recipe || '',
+            notes: g.notes || '',
+            tiles: (g.tiles || []).map(t => ({
+              id: t.id,
+              url: t.url,
+              storage_path: t.storage_path,
+            })),
+          }));
+          setGlazes(transformed);
+        } catch (error) {
+          console.error('Error loading glazes:', error);
+          // Fallback to localStorage
+          setGlazes(storage.get('glazes', []));
+        } finally {
+          setGlazesLoading(false);
+        }
+      } else {
+        // Offline mode - use localStorage
+        setGlazes(storage.get('glazes', []));
+        setGlazesLoading(false);
+      }
+    };
+
+    loadGlazes();
+  }, [isAuthenticated, offlineMode]);
+
   // Save to localStorage only in offline mode
   useEffect(() => {
     if (offlineMode || !isSupabaseConfigured()) {
       storage.set('projects', projects);
     }
   }, [projects, offlineMode]);
-  useEffect(() => { storage.set('glazes', glazes); }, [glazes]);
+  useEffect(() => {
+    if (offlineMode || !isSupabaseConfigured()) {
+      storage.set('glazes', glazes);
+    }
+  }, [glazes, offlineMode]);
   useEffect(() => { storage.set('reclaimBatches', reclaimBatches); }, [reclaimBatches]);
   useEffect(() => { storage.set('studioTips', studioTips); }, [studioTips]);
   useEffect(() => { storage.set('guilds', guilds); }, [guilds]);
 
-  const [expandedTips, setExpandedTips] = useState({ clay_reclaim: true, diy_tools: false, plaster_bats: false });
+  const [expandedTips, setExpandedTips] = useState({ clay_reclaim: true, diy_tools: false, plaster_bats: false, other: false });
+  const [tipsViewMode, setTipsViewMode] = useState('grouped'); // 'grouped' | 'flat'
 
-  const [form, setForm] = useState({ title: '', clay: '', name: '', type: '', recipe: '', photo: null, weight: '', source: '', batchNotes: '', tipCategory: 'clay_reclaim', tipTitle: '', tipContent: '', tipTags: [], guildName: '', guildLocation: '', guildDesc: '', inviteCode: '', guildPost: '', resourceTitle: '', resourceType: 'PDF', feedback: '' });
+  const [form, setForm] = useState({ title: '', clay: '', name: '', type: '', recipe: '', photo: null, photoFile: null, weight: '', source: '', batchNotes: '', tipCategory: 'clay_reclaim', tipTitle: '', tipContent: '', tipTags: [], guildName: '', guildLocation: '', guildDesc: '', inviteCode: '', guildPost: '', resourceTitle: '', resourceType: 'PDF', resourceUrl: '', resourceFile: null, feedback: '' });
 
   const stages = ['wedging', 'throwing', 'trimming', 'drying', 'bisque', 'glazing', 'firing', 'complete'];
 
@@ -141,11 +188,19 @@ function CoastalKilnApp() {
     }
 
     try {
-      if (isSupabaseConfigured() && !offlineMode && type === 'project') {
-        // Upload to Supabase storage
-        const photo = await projectsApi.addPhoto(selected.id, file, selected.stage);
-        setProjects(p => p.map(x => x.id === selected.id ? { ...x, photos: [...x.photos, photo] } : x));
-        setSelected({ ...selected, photos: [...selected.photos, photo] });
+      if (isSupabaseConfigured() && !offlineMode) {
+        if (type === 'project') {
+          // Upload project photo to Supabase storage
+          const photo = await projectsApi.addPhoto(selected.id, file, selected.stage, user?.id);
+          setProjects(p => p.map(x => x.id === selected.id ? { ...x, photos: [...x.photos, photo] } : x));
+          setSelected({ ...selected, photos: [...selected.photos, photo] });
+        } else {
+          // Upload glaze tile to Supabase storage
+          const tile = await glazesApi.addTile(selected.id, file, null, null, user?.id);
+          const newTile = { id: tile.id, url: tile.url, storage_path: tile.storage_path };
+          setGlazes(g => g.map(x => x.id === selected.id ? { ...x, tiles: [...x.tiles, newTile] } : x));
+          setSelected({ ...selected, tiles: [...selected.tiles, newTile] });
+        }
       } else {
         // Offline mode - use base64
         const reader = new FileReader();
@@ -180,6 +235,10 @@ function CoastalKilnApp() {
         setProjects(p => p.map(x => x.id === selected.id ? { ...x, photos: x.photos.filter(ph => ph.id !== pid) } : x));
         setSelected({ ...selected, photos: selected.photos.filter(ph => ph.id !== pid) });
       } else {
+        const tile = selected.tiles.find(t => t.id === pid);
+        if (isSupabaseConfigured() && !offlineMode && tile?.storage_path) {
+          await glazesApi.deleteTile(pid, tile.storage_path);
+        }
         setGlazes(g => g.map(x => x.id === selected.id ? { ...x, tiles: x.tiles.filter(t => t.id !== pid) } : x));
         setSelected({ ...selected, tiles: selected.tiles.filter(t => t.id !== pid) });
       }
@@ -194,7 +253,7 @@ function CoastalKilnApp() {
     return (
       <div className="min-h-screen bg-cream flex items-center justify-center">
         <div className="flex flex-col items-center">
-          <img src="/CoastalKilnLogo.png" alt="Coastal Kiln" className="w-24 h-24 animate-pulse" />
+          <img src="/CoastalKilnLogo.png" alt="Coastal Kiln" className="w-24 h-24 animate-spin-slow" />
           <p className="mt-4 text-text-secondary">Loading...</p>
         </div>
       </div>
@@ -216,11 +275,7 @@ function CoastalKilnApp() {
     );
   }
 
-  // Show welcome screen
-  if (showWelcome) {
-    return <WelcomeScreen onComplete={() => setShowWelcome(false)} />;
-  }
-
+  
 
   // Render Settings Modal
   function renderSettingsModal() {
@@ -240,7 +295,7 @@ function CoastalKilnApp() {
                   <button onClick={() => setSettingsView('profile')} className="w-full flex items-center justify-between p-4 bg-orange-100 rounded-2xl hover:from-orange-100 hover:to-amber-100 transition-all">
                     <div className="flex items-center gap-3">
                       <div className="w-12 h-12 bg-accent rounded-full flex items-center justify-center text-white text-xl font-bold shadow-md">
-                        {user.username[0]}
+                        {displayProfile.username[0]}
                       </div>
                       <span className="font-semibold text-text-primary">Your Profile</span>
                     </div>
@@ -290,16 +345,16 @@ function CoastalKilnApp() {
               <div className="p-6 space-y-4">
                 <div className="flex flex-col items-center mb-4">
                   <div className="w-24 h-24 bg-accent rounded-full flex items-center justify-center text-white text-4xl font-bold mb-3 shadow-lg">
-                    {user.username[0]}
+                    {displayProfile.username[0]}
                   </div>
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-text-primary mb-2">Username</label>
-                  <input type="text" value={user.username} onChange={(e) => setUser({ ...user, username: e.target.value })} placeholder="Username" className="w-full px-4 py-3 border border-stone-200 rounded-xl focus:ring-2 focus:ring-accent focus:border-transparent" />
+                  <input type="text" value={displayProfile.username} onChange={(e) => setUser({ ...user, username: e.target.value })} placeholder="Username" className="w-full px-4 py-3 border border-stone-200 rounded-xl focus:ring-2 focus:ring-accent focus:border-transparent" />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-text-primary mb-2">Email</label>
-                  <input type="email" value={user.email} onChange={(e) => setUser({ ...user, email: e.target.value })} placeholder="Email" className="w-full px-4 py-3 border border-stone-200 rounded-xl focus:ring-2 focus:ring-accent focus:border-transparent" />
+                  <input type="email" value={displayProfile.email} onChange={(e) => setUser({ ...user, email: e.target.value })} placeholder="Email" className="w-full px-4 py-3 border border-stone-200 rounded-xl focus:ring-2 focus:ring-accent focus:border-transparent" />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-text-primary mb-2">Bio</label>
@@ -496,24 +551,24 @@ function CoastalKilnApp() {
               <h1 className="text-4xl font-bold text-text-primary mb-6">Sustainable Studio</h1>
 
               <div className="grid grid-cols-2 gap-3">
-                <button onClick={() => setSustainableTab('reclaim')} className={`p-6 rounded-2xl text-left transition-all ${sustainableTab === 'reclaim' ? 'bg-card-reclaim shadow-md' : 'bg-white shadow-sm'}`}>
-                  <h3 className="font-semibold text-text-primary text-lg">Clay Reclaim</h3>
+                <button onClick={() => setSustainableTab('reclaim')} className={`p-6 rounded-2xl text-left transition-all ${sustainableTab === 'reclaim' ? 'bg-nav-reclaim shadow-lg' : 'bg-white shadow-sm'}`}>
+                  <h3 className={`font-semibold text-lg ${sustainableTab === 'reclaim' ? 'text-white' : 'text-text-primary'}`}>Clay Reclaim</h3>
                 </button>
 
-                <button onClick={() => setSustainableTab('tips')} className={`p-6 rounded-2xl text-left transition-all ${sustainableTab === 'tips' ? 'bg-card-tips shadow-md' : 'bg-white shadow-sm'}`}>
-                  <h3 className="font-semibold text-text-primary text-lg">Studio Tips</h3>
+                <button onClick={() => setSustainableTab('tips')} className={`p-6 rounded-2xl text-left transition-all bg-nav-tips ${sustainableTab === 'tips' ? 'shadow-lg' : 'shadow-sm opacity-80'}`}>
+                  <h3 className="font-semibold text-lg text-white">Studio Tips</h3>
                 </button>
               </div>
             </div>
 
             {sustainableTab === 'reclaim' ? (
               <div className="space-y-4">
-                <div className="bg-card-reclaim rounded-2xl p-6 shadow-sm">
-                  <h3 className="text-lg font-semibold text-green-900 mb-2">Total Reclaimed</h3>
-                  <p className="text-4xl font-bold text-green-700">
+                <div className="bg-white rounded-2xl p-6 shadow-sm">
+                  <h3 className="text-lg font-semibold text-text-primary mb-2">Total Reclaimed</h3>
+                  <p className="text-4xl font-bold text-text-primary">
                     {reclaimBatches.filter(b => b.weight).reduce((sum, b) => sum + b.weight, 0).toFixed(1)} kg
                   </p>
-                  <p className="text-sm text-green-700 mt-1">{reclaimBatches.length} batches in progress</p>
+                  <p className="text-sm text-text-secondary mt-1">{reclaimBatches.length} batches in progress</p>
                 </div>
 
                 <div className="space-y-3">
@@ -544,36 +599,85 @@ function CoastalKilnApp() {
               </div>
             ) : (
               <div className="space-y-4">
-                {['clay_reclaim', 'diy_tools', 'plaster_bats'].map(category => {
-                  const categoryTips = studioTips.filter(tip => tip.category === category);
-                  const categoryLabels = { clay_reclaim: 'Clay Reclaim', diy_tools: 'DIY Tools', plaster_bats: 'Plaster Bats' };
+                {/* View toggle buttons */}
+                <div className="flex gap-2 bg-white rounded-xl p-1 shadow-sm">
+                  <button
+                    onClick={() => setTipsViewMode('grouped')}
+                    className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${tipsViewMode === 'grouped' ? 'bg-accent text-white' : 'text-text-secondary hover:bg-cream'}`}
+                  >
+                    Grouped
+                  </button>
+                  <button
+                    onClick={() => setTipsViewMode('flat')}
+                    className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${tipsViewMode === 'flat' ? 'bg-accent text-white' : 'text-text-secondary hover:bg-cream'}`}
+                  >
+                    All
+                  </button>
+                </div>
 
-                  return (
-                    <div key={category} className="bg-white rounded-2xl overflow-hidden shadow-sm">
-                      <button onClick={() => setExpandedTips(p => ({ ...p, [category]: !p[category] }))} className="w-full flex items-center justify-between p-4 hover:bg-cream transition-colors">
-                        <h3 className="font-semibold text-text-primary">{categoryLabels[category]}</h3>
-                        {expandedTips[category] ? <ChevronUp size={20} className="text-text-muted" /> : <ChevronDown size={20} className="text-text-muted" />}
-                      </button>
-
-                      {expandedTips[category] && (
-                        <div className="p-4 pt-0 space-y-3">
-                          {categoryTips.map(tip => (
-                            <div key={tip.id} className="bg-cream rounded-xl p-4">
-                              <h4 className="font-medium text-text-primary mb-2">{tip.title}</h4>
-                              <p className="text-sm text-text-secondary mb-3">{tip.content}</p>
-                              <div className="flex flex-wrap gap-2">
-                                {tip.tags.map((tag, idx) => (
-                                  <span key={idx} className="px-2 py-1 bg-card-pieces/30 text-text-primary text-xs rounded-full">{tag}</span>
-                                ))}
-                              </div>
-                            </div>
-                          ))}
-                          {categoryTips.length === 0 && <p className="text-sm text-text-muted text-center py-4">No tips yet. Add your own!</p>}
+                {tipsViewMode === 'flat' ? (
+                  /* Flat view - all tips sorted by date/id */
+                  <div className="space-y-3">
+                    {[...studioTips].sort((a, b) => (b.id || '').localeCompare(a.id || '')).map(tip => {
+                      const categoryLabels = { clay_reclaim: 'Clay Reclaim', diy_tools: 'DIY Tools', plaster_bats: 'Plaster Bats', other: 'Other' };
+                      return (
+                        <div key={tip.id} className="bg-white rounded-2xl p-4 shadow-sm">
+                          <div className="flex items-start justify-between mb-2">
+                            <h4 className="font-medium text-text-primary">{tip.title}</h4>
+                            <span className="px-2 py-1 bg-nav-tips/20 text-nav-tips text-xs rounded-full font-medium">{categoryLabels[tip.category] || tip.category}</span>
+                          </div>
+                          <p className="text-sm text-text-secondary mb-3">{tip.content}</p>
+                          <div className="flex flex-wrap gap-2">
+                            {tip.tags.map((tag, idx) => (
+                              <span key={idx} className="px-2 py-1 bg-nav-tips/20 text-nav-tips text-xs rounded-full font-medium">{tag}</span>
+                            ))}
+                          </div>
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
+                      );
+                    })}
+                    {studioTips.length === 0 && (
+                      <div className="text-center py-12 bg-white rounded-2xl shadow-sm">
+                        <BookOpen size={48} className="mx-auto text-text-muted mb-3" />
+                        <h3 className="text-lg font-medium text-text-primary mb-1">No tips yet</h3>
+                        <p className="text-text-secondary">Add your first studio tip!</p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  /* Grouped view - collapsible categories */
+                  <>
+                    {['clay_reclaim', 'diy_tools', 'plaster_bats', 'other'].map(category => {
+                      const categoryTips = studioTips.filter(tip => tip.category === category);
+                      const categoryLabels = { clay_reclaim: 'Clay Reclaim', diy_tools: 'DIY Tools', plaster_bats: 'Plaster Bats', other: 'Other' };
+
+                      return (
+                        <div key={category} className="bg-white rounded-2xl overflow-hidden shadow-sm">
+                          <button onClick={() => setExpandedTips(p => ({ ...p, [category]: !p[category] }))} className="w-full flex items-center justify-between p-4 hover:bg-nav-tips/20 transition-colors">
+                            <h3 className="font-semibold text-text-primary">{categoryLabels[category]}</h3>
+                            {expandedTips[category] ? <ChevronUp size={20} className="text-text-muted" /> : <ChevronDown size={20} className="text-text-muted" />}
+                          </button>
+
+                          {expandedTips[category] && (
+                            <div className="p-4 pt-0 space-y-3">
+                              {categoryTips.map(tip => (
+                                <div key={tip.id} className="bg-white border border-stone-200 rounded-xl p-4">
+                                  <h4 className="font-medium text-text-primary mb-2">{tip.title}</h4>
+                                  <p className="text-sm text-text-secondary mb-3">{tip.content}</p>
+                                  <div className="flex flex-wrap gap-2">
+                                    {tip.tags.map((tag, idx) => (
+                                      <span key={idx} className="px-2 py-1 bg-nav-tips/20 text-nav-tips text-xs rounded-full font-medium">{tag}</span>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))}
+                              {categoryTips.length === 0 && <p className="text-sm text-text-muted text-center py-4">No tips yet. Add your own!</p>}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -612,9 +716,9 @@ function CoastalKilnApp() {
             </div>
 
             {selectedGuild.event && (
-              <div className="bg-card-pieces/30 rounded-2xl p-6 shadow-sm">
+              <div className="bg-nav-guilds/10 rounded-2xl p-6 shadow-sm">
                 <div className="flex items-start gap-3">
-                  <Calendar className="text-accent mt-1" size={24} />
+                  <Calendar className="text-nav-guilds mt-1" size={24} />
                   <div>
                     <h3 className="font-semibold text-text-primary mb-1">Upcoming Event</h3>
                     <p className="text-text-secondary">{selectedGuild.event}</p>
@@ -661,7 +765,7 @@ function CoastalKilnApp() {
                   <p>No messages yet</p>
                 </div>
               )}
-              <button onClick={() => setShowModal(true)} className="w-full px-4 py-2 bg-accent text-white rounded-xl hover:bg-accent-hover">
+              <button onClick={() => { setModalType('post'); setShowModal(true); }} className="w-full px-4 py-2 bg-accent text-white rounded-xl hover:bg-accent-hover">
                 New Post
               </button>
             </div>
@@ -674,13 +778,33 @@ function CoastalKilnApp() {
               {selectedGuild.resources && selectedGuild.resources.length > 0 ? (
                 <div className="space-y-2 mb-4">
                   {selectedGuild.resources.map(resource => (
-                    <div key={resource.id} className="flex items-center justify-between p-3 bg-cream rounded-xl">
-                      <div>
-                        <p className="font-medium text-text-primary text-sm">{resource.title}</p>
-                        <p className="text-xs text-text-muted">Added by {resource.addedBy}</p>
+                    <a
+                      key={resource.id}
+                      href={resource.url || '#'}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`flex items-center justify-between p-3 bg-cream rounded-xl transition-colors ${resource.url ? 'hover:bg-stone-200 cursor-pointer' : 'cursor-default'}`}
+                      onClick={(e) => {
+                        if (!resource.url) {
+                          e.preventDefault();
+                        }
+                      }}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-text-primary text-sm truncate">{resource.title}</p>
+                        <p className="text-xs text-text-muted">Added by {resource.addedBy || resource.added_by_profile?.username || 'Unknown'}</p>
                       </div>
-                      <span className="px-2 py-1 bg-stone-200 text-text-primary text-xs rounded">{resource.type}</span>
-                    </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className={`px-2 py-1 text-xs rounded ${
+                          resource.type === 'PDF' ? 'bg-red-100 text-red-700' :
+                          resource.type === 'Video' ? 'bg-purple-100 text-purple-700' :
+                          'bg-blue-100 text-blue-700'
+                        }`}>{resource.type}</span>
+                        {resource.url && (
+                          <ChevronRight size={16} className="text-text-muted" />
+                        )}
+                      </div>
+                    </a>
                   ))}
                 </div>
               ) : (
@@ -688,7 +812,7 @@ function CoastalKilnApp() {
                   <p>No resources yet</p>
                 </div>
               )}
-              <button onClick={() => setShowModal(true)} className="w-full px-4 py-2 bg-stone-600 text-white rounded-xl hover:bg-stone-700">
+              <button onClick={() => { setModalType('resource'); setShowModal(true); }} className="w-full px-4 py-2 bg-stone-600 text-white rounded-xl hover:bg-stone-700">
                 Add Resource
               </button>
             </div>
@@ -700,12 +824,12 @@ function CoastalKilnApp() {
               <h1 className="text-4xl font-bold text-text-primary mb-6">My Guilds</h1>
 
               <div className="grid grid-cols-2 gap-3">
-                <button onClick={() => setGuildTab('my-guilds')} className={`p-6 rounded-2xl text-left transition-all ${guildTab === 'my-guilds' ? 'bg-card-pieces shadow-md' : 'bg-white shadow-sm'}`}>
-                  <h3 className="font-semibold text-text-primary text-lg">My Guilds</h3>
+                <button onClick={() => setGuildTab('my-guilds')} className={`p-6 rounded-2xl text-left transition-all ${guildTab === 'my-guilds' ? 'bg-nav-guilds shadow-md' : 'bg-white shadow-sm'}`}>
+                  <h3 className={`font-semibold text-lg ${guildTab === 'my-guilds' ? 'text-white' : 'text-text-primary'}`}>My Guilds</h3>
                 </button>
 
-                <button onClick={() => setGuildTab('discover')} className={`p-6 rounded-2xl text-left transition-all ${guildTab === 'discover' ? 'bg-card-tips shadow-md' : 'bg-white shadow-sm'}`}>
-                  <h3 className="font-semibold text-text-primary text-lg">Discover</h3>
+                <button onClick={() => setGuildTab('discover')} className={`p-6 rounded-2xl text-left transition-all ${guildTab === 'discover' ? 'bg-nav-discover shadow-md' : 'bg-white shadow-sm'}`}>
+                  <h3 className={`font-semibold text-lg ${guildTab === 'discover' ? 'text-white' : 'text-text-primary'}`}>Discover</h3>
                 </button>
               </div>
             </div>
@@ -719,7 +843,7 @@ function CoastalKilnApp() {
                         <h3 className="text-xl font-semibold text-text-primary mb-1">{guild.name}</h3>
                         <p className="text-sm text-text-secondary">{guild.location}</p>
                       </div>
-                      <span className="px-3 py-1 bg-card-pieces/50 text-text-primary text-sm font-medium rounded-full">Member</span>
+                      <span className="px-3 py-1 bg-nav-guilds/20 text-text-primary text-sm font-medium rounded-full">Member</span>
                     </div>
                     <p className="text-text-secondary mb-3">{guild.description}</p>
                     <div className="flex items-center gap-4 text-sm text-text-muted">
@@ -769,7 +893,7 @@ function CoastalKilnApp() {
                           <span>{guild.members} members</span>
                         </div>
                         <button onClick={() => {
-                          setGuilds(prev => prev.map(g => g.id === guild.id ? { ...g, isMember: true, members: g.members + 1, memberList: [...(g.memberList || []), user.username] } : g));
+                          setGuilds(prev => prev.map(g => g.id === guild.id ? { ...g, isMember: true, members: g.members + 1, memberList: [...(g.memberList || []), displayProfile.username] } : g));
                         }} className="px-4 py-2 bg-accent text-white rounded-xl hover:bg-accent-hover text-sm font-medium">
                           Join Guild
                         </button>
@@ -784,22 +908,22 @@ function CoastalKilnApp() {
           <div className="space-y-6">
             {/* Hero */}
             <div className="px-2">
-              <p className="text-text-secondary mb-1">Hello, {user.username}</p>
+              <p className="text-text-secondary mb-1">Hello, {displayProfile.username}</p>
               <h1 className="text-4xl font-bold text-text-primary mb-6">What are we making today?</h1>
 
               <div className="grid grid-cols-2 gap-3">
-                <button onClick={() => setTab('pieces')} className={`p-6 rounded-2xl text-left transition-all ${tab === 'pieces' ? 'bg-card-pieces shadow-md' : 'bg-white shadow-sm'}`}>
+                <button onClick={() => setTab('pieces')} className={`p-6 rounded-2xl text-left transition-all bg-nav-pieces ${tab === 'pieces' ? 'shadow-lg' : 'shadow-sm opacity-80'}`}>
                   <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center mb-3">
-                    <Flame size={22} className={tab === 'pieces' ? 'text-accent' : 'text-text-muted'} />
+                    <Flame size={22} className="text-nav-pieces" />
                   </div>
                   <h3 className="font-semibold text-text-primary text-lg">Pieces</h3>
                 </button>
 
-                <button onClick={() => setTab('glazes')} className={`p-6 rounded-2xl text-left transition-all ${tab === 'glazes' ? 'bg-card-glaze shadow-md' : 'bg-white shadow-sm'}`}>
+                <button onClick={() => setTab('glazes')} className={`p-6 rounded-2xl text-left transition-all bg-nav-glaze ${tab === 'glazes' ? 'shadow-lg' : 'shadow-sm opacity-80'}`}>
                   <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center mb-3">
-                    <Palette size={22} className={tab === 'glazes' ? 'text-accent' : 'text-text-muted'} />
+                    <Palette size={22} className="text-nav-glaze" />
                   </div>
-                  <h3 className="font-semibold text-text-primary text-lg">Glaze Garden</h3>
+                  <h3 className="font-semibold text-white text-lg">Glaze Garden</h3>
                 </button>
               </div>
             </div>
@@ -962,6 +1086,15 @@ function CoastalKilnApp() {
                 const n = e.target.value;
                 setGlazes(g => g.map(x => x.id === selected.id ? { ...x, notes: n } : x));
                 setSelected({ ...selected, notes: n });
+              }} onBlur={async (e) => {
+                // Save notes to Supabase on blur
+                if (isSupabaseConfigured() && !offlineMode) {
+                  try {
+                    await glazesApi.update(selected.id, { notes: e.target.value });
+                  } catch (error) {
+                    console.error('Error saving glaze notes:', error);
+                  }
+                }
               }} placeholder="Application tips..." rows={4} className="w-full px-3 py-2 border border-stone-200 rounded-xl focus:ring-2 focus:ring-accent" />
             </div>
           </div>
@@ -999,15 +1132,15 @@ function CoastalKilnApp() {
           <div className="bg-white rounded-2xl max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-bold text-text-primary">
-                {selectedGuild && form.guildPost !== undefined ? 'New Post' :
-                 selectedGuild && form.resourceTitle !== undefined ? 'Add Resource' :
+                {selectedGuild && modalType === 'post' ? 'New Post' :
+                 selectedGuild && modalType === 'resource' ? 'Add Resource' :
                  currentView === 'guilds' && guildTab === 'discover' && form.inviteCode !== undefined ? 'Join by Invite Code' :
                  currentView === 'guilds' ? 'Create Guild' :
                  currentView === 'sustainable' && sustainableTab === 'reclaim' ? 'New Reclaim Batch' :
                  currentView === 'sustainable' && sustainableTab === 'tips' ? 'New Studio Tip' :
                  tab === 'pieces' ? 'New Piece' : 'New Glaze'}
               </h2>
-              <button onClick={() => { setShowModal(false); setForm({ title: '', clay: '', name: '', type: '', recipe: '', photo: null, weight: '', source: '', batchNotes: '', tipCategory: 'clay_reclaim', tipTitle: '', tipContent: '', tipTags: [], guildName: '', guildLocation: '', guildDesc: '', inviteCode: '', guildPost: '', resourceTitle: '', resourceType: 'PDF', feedback: '' }); }}>
+              <button onClick={() => { setShowModal(false); setModalType(null); setForm({ title: '', clay: '', name: '', type: '', recipe: '', photo: null, photoFile: null, weight: '', source: '', batchNotes: '', tipCategory: 'clay_reclaim', tipTitle: '', tipContent: '', tipTags: [], guildName: '', guildLocation: '', guildDesc: '', inviteCode: '', guildPost: '', resourceTitle: '', resourceType: 'PDF', resourceUrl: '', resourceFile: null, feedback: '' }); }}>
                 <X size={24} />
               </button>
             </div>
@@ -1020,7 +1153,7 @@ function CoastalKilnApp() {
                   <button onClick={() => {
                     const guild = guilds.find(g => g.inviteCode === form.inviteCode);
                     if (guild && !guild.isMember) {
-                      setGuilds(prev => prev.map(g => g.id === guild.id ? { ...g, isMember: true, members: g.members + 1, memberList: [...(g.memberList || []), user.username] } : g));
+                      setGuilds(prev => prev.map(g => g.id === guild.id ? { ...g, isMember: true, members: g.members + 1, memberList: [...(g.memberList || []), displayProfile.username] } : g));
                       setForm({ ...form, inviteCode: '' });
                       setShowModal(false);
                       setGuildTab('my-guilds');
@@ -1028,17 +1161,18 @@ function CoastalKilnApp() {
                   }} disabled={!form.inviteCode} className="flex-1 px-4 py-2 bg-accent text-white rounded-xl disabled:bg-stone-300">Join</button>
                 </div>
               </div>
-            ) : selectedGuild && form.guildPost !== undefined ? (
+            ) : selectedGuild && modalType === 'post' ? (
               <div className="space-y-4">
                 <textarea value={form.guildPost} onChange={(e) => setForm({ ...form, guildPost: e.target.value })} placeholder="Share something..." rows={4} className="w-full px-3 py-2 border border-stone-200 rounded-xl" />
                 <div className="flex gap-3">
-                  <button onClick={() => { setShowModal(false); setForm({ ...form, guildPost: '' }); }} className="flex-1 px-4 py-2 border border-stone-200 rounded-xl">Cancel</button>
+                  <button onClick={() => { setShowModal(false); setModalType(null); setForm({ ...form, guildPost: '' }); }} className="flex-1 px-4 py-2 border border-stone-200 rounded-xl">Cancel</button>
                   <button onClick={() => {
                     if (!form.guildPost) return;
-                    const newPost = { id: Date.now().toString(), author: user.username, content: form.guildPost, time: 'Just now' };
+                    const newPost = { id: Date.now().toString(), author: displayProfile.username, content: form.guildPost, time: 'Just now' };
                     setGuilds(prev => prev.map(g => g.id === selectedGuild.id ? { ...g, posts: [newPost, ...(g.posts || [])] } : g));
                     setSelectedGuild({ ...selectedGuild, posts: [newPost, ...(selectedGuild.posts || [])] });
                     setForm({ ...form, guildPost: '' });
+                    setModalType(null);
                     setShowModal(false);
                   }} disabled={!form.guildPost} className="flex-1 px-4 py-2 bg-accent text-white rounded-xl disabled:bg-stone-300 flex items-center justify-center gap-2">
                     <Send size={18} />
@@ -1046,24 +1180,104 @@ function CoastalKilnApp() {
                   </button>
                 </div>
               </div>
-            ) : selectedGuild && form.resourceTitle !== undefined ? (
+            ) : selectedGuild && modalType === 'resource' ? (
               <div className="space-y-4">
                 <input type="text" value={form.resourceTitle} onChange={(e) => setForm({ ...form, resourceTitle: e.target.value })} placeholder="Resource title" className="w-full px-3 py-2 border border-stone-200 rounded-xl" />
-                <select value={form.resourceType} onChange={(e) => setForm({ ...form, resourceType: e.target.value })} className="w-full px-3 py-2 border border-stone-200 rounded-xl">
+                <select value={form.resourceType} onChange={(e) => setForm({ ...form, resourceType: e.target.value, resourceFile: null, resourceUrl: '' })} className="w-full px-3 py-2 border border-stone-200 rounded-xl">
                   <option value="PDF">PDF</option>
                   <option value="Link">Link</option>
                   <option value="Video">Video</option>
                 </select>
+
+                {/* File upload for PDF type */}
+                {form.resourceType === 'PDF' && (
+                  <div>
+                    <label className="block text-sm font-medium text-text-primary mb-1">Upload File</label>
+                    {form.resourceFile ? (
+                      <div className="flex items-center justify-between p-3 bg-cream rounded-xl">
+                        <span className="text-sm text-text-primary truncate">{form.resourceFile.name}</span>
+                        <button onClick={() => setForm({ ...form, resourceFile: null })} className="p-1 text-text-muted hover:text-red-500">
+                          <X size={16} />
+                        </button>
+                      </div>
+                    ) : (
+                      <label className="flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-stone-300 rounded-xl text-text-secondary hover:border-accent cursor-pointer">
+                        <BookOpen size={20} />
+                        <span className="font-medium">Select PDF file</span>
+                        <input type="file" accept=".pdf,application/pdf" onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) setForm({ ...form, resourceFile: file });
+                        }} className="hidden" />
+                      </label>
+                    )}
+                  </div>
+                )}
+
+                {/* URL input for Link or Video type */}
+                {(form.resourceType === 'Link' || form.resourceType === 'Video') && (
+                  <div>
+                    <label className="block text-sm font-medium text-text-primary mb-1">URL</label>
+                    <input
+                      type="url"
+                      value={form.resourceUrl}
+                      onChange={(e) => setForm({ ...form, resourceUrl: e.target.value })}
+                      placeholder={form.resourceType === 'Video' ? 'https://youtube.com/...' : 'https://...'}
+                      className="w-full px-3 py-2 border border-stone-200 rounded-xl"
+                    />
+                  </div>
+                )}
+
                 <div className="flex gap-3">
-                  <button onClick={() => { setShowModal(false); setForm({ ...form, resourceTitle: '' }); }} className="flex-1 px-4 py-2 border border-stone-200 rounded-xl">Cancel</button>
-                  <button onClick={() => {
+                  <button onClick={() => { setShowModal(false); setModalType(null); setForm({ ...form, resourceTitle: '', resourceType: 'PDF', resourceUrl: '', resourceFile: null }); }} className="flex-1 px-4 py-2 border border-stone-200 rounded-xl">Cancel</button>
+                  <button onClick={async () => {
                     if (!form.resourceTitle) return;
-                    const newResource = { id: Date.now().toString(), title: form.resourceTitle, type: form.resourceType, addedBy: user.username };
-                    setGuilds(prev => prev.map(g => g.id === selectedGuild.id ? { ...g, resources: [...(g.resources || []), newResource] } : g));
-                    setSelectedGuild({ ...selectedGuild, resources: [...(selectedGuild.resources || []), newResource] });
-                    setForm({ ...form, resourceTitle: '', resourceType: 'PDF' });
-                    setShowModal(false);
-                  }} disabled={!form.resourceTitle} className="flex-1 px-4 py-2 bg-stone-600 text-white rounded-xl disabled:bg-stone-300">Add</button>
+
+                    // Validate based on type
+                    if (form.resourceType === 'PDF' && !form.resourceFile) {
+                      alert('Please select a PDF file');
+                      return;
+                    }
+                    if ((form.resourceType === 'Link' || form.resourceType === 'Video') && !form.resourceUrl) {
+                      alert('Please enter a URL');
+                      return;
+                    }
+
+                    try {
+                      let newResource;
+
+                      if (form.resourceType === 'PDF' && form.resourceFile) {
+                        // Upload file if PDF type
+                        // Note: This would use guilds API in online mode
+                        // For localStorage mode, we'll store a placeholder
+                        newResource = {
+                          id: Date.now().toString(),
+                          title: form.resourceTitle,
+                          type: form.resourceType,
+                          addedBy: displayProfile.username,
+                          url: URL.createObjectURL(form.resourceFile), // Temporary blob URL for preview
+                          fileName: form.resourceFile.name
+                        };
+                      } else {
+                        // Link or Video
+                        newResource = {
+                          id: Date.now().toString(),
+                          title: form.resourceTitle,
+                          type: form.resourceType,
+                          addedBy: displayProfile.username,
+                          url: form.resourceUrl
+                        };
+                      }
+
+                      setGuilds(prev => prev.map(g => g.id === selectedGuild.id ? { ...g, resources: [...(g.resources || []), newResource] } : g));
+                      setSelectedGuild({ ...selectedGuild, resources: [...(selectedGuild.resources || []), newResource] });
+                      setForm({ ...form, resourceTitle: '', resourceType: 'PDF', resourceUrl: '', resourceFile: null });
+                      setModalType(null);
+                      setShowModal(false);
+                    } catch (error) {
+                      console.error('Error adding resource:', error);
+                      alert('Failed to add resource');
+                    }
+                  }} disabled={!form.resourceTitle || (form.resourceType === 'PDF' && !form.resourceFile) || ((form.resourceType === 'Link' || form.resourceType === 'Video') && !form.resourceUrl)} className="flex-1 px-4 py-2 bg-stone-600 text-white rounded-xl disabled:bg-stone-300">Add</button>
                 </div>
               </div>
             ) : currentView === 'guilds' && !selectedGuild ? (
@@ -1076,7 +1290,7 @@ function CoastalKilnApp() {
                   <button onClick={() => {
                     if (!form.guildName || !form.guildLocation) return;
                     const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-                    setGuilds([{ id: Date.now().toString(), name: form.guildName, members: 1, memberList: [user.username], location: form.guildLocation, description: form.guildDesc, isMember: true, isAdmin: true, event: null, posts: [], resources: [], inviteCode }, ...guilds]);
+                    setGuilds([{ id: Date.now().toString(), name: form.guildName, members: 1, memberList: [displayProfile.username], location: form.guildLocation, description: form.guildDesc, isMember: true, isAdmin: true, event: null, posts: [], resources: [], inviteCode }, ...guilds]);
                     setForm({ ...form, guildName: '', guildLocation: '', guildDesc: '' });
                     setShowModal(false);
                   }} disabled={!form.guildName || !form.guildLocation} className="flex-1 px-4 py-2 bg-accent text-white rounded-xl disabled:bg-stone-300">Create</button>
@@ -1097,11 +1311,11 @@ function CoastalKilnApp() {
                   <textarea value={form.batchNotes} onChange={(e) => setForm({ ...form, batchNotes: e.target.value })} placeholder="Clay type, mixing notes..." rows={3} className="w-full px-3 py-2 border border-stone-200 rounded-xl" />
                 </div>
                 <div className="flex gap-3">
-                  <button onClick={() => { setShowModal(false); setForm({ title: '', clay: '', name: '', type: '', recipe: '', photo: null, weight: '', source: '', batchNotes: '', tipCategory: 'clay_reclaim', tipTitle: '', tipContent: '', tipTags: [] }); }} className="flex-1 px-4 py-2 border border-stone-200 rounded-xl">Cancel</button>
+                  <button onClick={() => { setShowModal(false); setForm({ title: '', clay: '', name: '', type: '', recipe: '', photo: null, photoFile: null, weight: '', source: '', batchNotes: '', tipCategory: 'clay_reclaim', tipTitle: '', tipContent: '', tipTags: [], guildName: '', guildLocation: '', guildDesc: '', inviteCode: '', guildPost: '', resourceTitle: '', resourceType: 'PDF', resourceUrl: '', resourceFile: null, feedback: '' }); }} className="flex-1 px-4 py-2 border border-stone-200 rounded-xl">Cancel</button>
                   <button onClick={() => {
                     if (!form.source) return;
                     setReclaimBatches([{ id: Date.now().toString(), weight: form.weight ? parseFloat(form.weight) : null, source: form.source, date: new Date().toISOString().split('T')[0], status: 'drying', notes: form.batchNotes }, ...reclaimBatches]);
-                    setForm({ title: '', clay: '', name: '', type: '', recipe: '', photo: null, weight: '', source: '', batchNotes: '', tipCategory: 'clay_reclaim', tipTitle: '', tipContent: '', tipTags: [] });
+                    setForm({ title: '', clay: '', name: '', type: '', recipe: '', photo: null, photoFile: null, weight: '', source: '', batchNotes: '', tipCategory: 'clay_reclaim', tipTitle: '', tipContent: '', tipTags: [], guildName: '', guildLocation: '', guildDesc: '', inviteCode: '', guildPost: '', resourceTitle: '', resourceType: 'PDF', resourceUrl: '', resourceFile: null, feedback: '' });
                     setShowModal(false);
                   }} disabled={!form.source} className="flex-1 px-4 py-2 bg-accent text-white rounded-xl disabled:bg-stone-300">Create</button>
                 </div>
@@ -1114,6 +1328,7 @@ function CoastalKilnApp() {
                     <option value="clay_reclaim">Clay Reclaim</option>
                     <option value="diy_tools">DIY Tools</option>
                     <option value="plaster_bats">Plaster Bats</option>
+                    <option value="other">Other</option>
                   </select>
                 </div>
                 <div>
@@ -1129,11 +1344,11 @@ function CoastalKilnApp() {
                   <input type="text" value={form.tipTags.join(', ')} onChange={(e) => setForm({ ...form, tipTags: e.target.value.split(',').map(t => t.trim()).filter(t => t) })} placeholder="e.g., Water Conservation, Energy" className="w-full px-3 py-2 border border-stone-200 rounded-xl" />
                 </div>
                 <div className="flex gap-3">
-                  <button onClick={() => { setShowModal(false); setForm({ title: '', clay: '', name: '', type: '', recipe: '', photo: null, weight: '', source: '', batchNotes: '', tipCategory: 'clay_reclaim', tipTitle: '', tipContent: '', tipTags: [] }); }} className="flex-1 px-4 py-2 border border-stone-200 rounded-xl">Cancel</button>
+                  <button onClick={() => { setShowModal(false); setForm({ title: '', clay: '', name: '', type: '', recipe: '', photo: null, photoFile: null, weight: '', source: '', batchNotes: '', tipCategory: 'clay_reclaim', tipTitle: '', tipContent: '', tipTags: [], guildName: '', guildLocation: '', guildDesc: '', inviteCode: '', guildPost: '', resourceTitle: '', resourceType: 'PDF', resourceUrl: '', resourceFile: null, feedback: '' }); }} className="flex-1 px-4 py-2 border border-stone-200 rounded-xl">Cancel</button>
                   <button onClick={() => {
                     if (!form.tipTitle || !form.tipContent) return;
                     setStudioTips([...studioTips, { id: Date.now().toString(), category: form.tipCategory, title: form.tipTitle, content: form.tipContent, tags: form.tipTags }]);
-                    setForm({ title: '', clay: '', name: '', type: '', recipe: '', photo: null, weight: '', source: '', batchNotes: '', tipCategory: 'clay_reclaim', tipTitle: '', tipContent: '', tipTags: [] });
+                    setForm({ title: '', clay: '', name: '', type: '', recipe: '', photo: null, photoFile: null, weight: '', source: '', batchNotes: '', tipCategory: 'clay_reclaim', tipTitle: '', tipContent: '', tipTags: [], guildName: '', guildLocation: '', guildDesc: '', inviteCode: '', guildPost: '', resourceTitle: '', resourceType: 'PDF', resourceUrl: '', resourceFile: null, feedback: '' });
                     setShowModal(false);
                   }} disabled={!form.tipTitle || !form.tipContent} className="flex-1 px-4 py-2 bg-accent text-white rounded-xl disabled:bg-stone-300">Add Tip</button>
                 </div>
@@ -1143,7 +1358,7 @@ function CoastalKilnApp() {
                 {form.photo ? (
                   <div className="relative aspect-square rounded-xl overflow-hidden border-2">
                     <img src={form.photo} alt="Preview" className="w-full h-full object-cover" />
-                    <button onClick={() => setForm({ ...form, photo: null })} className="absolute top-2 right-2 p-2 bg-red-600 text-white rounded-full">
+                    <button onClick={() => setForm({ ...form, photo: null, photoFile: null })} className="absolute top-2 right-2 p-2 bg-red-600 text-white rounded-full">
                       <X size={16} />
                     </button>
                   </div>
@@ -1155,37 +1370,75 @@ function CoastalKilnApp() {
                       const file = e.target.files?.[0];
                       if (!file) return;
                       const reader = new FileReader();
-                      reader.onloadend = () => setForm({ ...form, photo: reader.result });
+                      reader.onloadend = () => setForm({ ...form, photo: reader.result, photoFile: file });
                       reader.readAsDataURL(file);
                     }} className="hidden" />
                   </label>
                 )}
                 <input type="text" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Piece name" className="w-full px-3 py-2 border border-stone-200 rounded-xl" />
                 <input type="text" value={form.clay} onChange={(e) => setForm({ ...form, clay: e.target.value })} placeholder="Clay body" className="w-full px-3 py-2 border border-stone-200 rounded-xl" />
-                <div className="flex gap-3">
-                  <button onClick={() => { setShowModal(false); setForm({ title: '', clay: '', name: '', type: '', recipe: '', photo: null, weight: '', source: '', batchNotes: '', tipCategory: 'clay_reclaim', tipTitle: '', tipContent: '', tipTags: [] }); }} className="flex-1 px-4 py-2 border border-stone-200 rounded-xl">Cancel</button>
+                <div className="flex gap-3" onClick={(e) => {
+                  console.log('🏺 Button container clicked. Button disabled?', !form.title || !form.clay);
+                  console.log('🏺 Current form values:', { title: form.title, clay: form.clay });
+                }}>
+                  <button onClick={() => { setShowModal(false); setForm({ title: '', clay: '', name: '', type: '', recipe: '', photo: null, photoFile: null, weight: '', source: '', batchNotes: '', tipCategory: 'clay_reclaim', tipTitle: '', tipContent: '', tipTags: [], guildName: '', guildLocation: '', guildDesc: '', inviteCode: '', guildPost: '', resourceTitle: '', resourceType: 'PDF', resourceUrl: '', resourceFile: null, feedback: '' }); }} className="flex-1 px-4 py-2 border border-stone-200 rounded-xl">Cancel</button>
                   <button onClick={async () => {
-                    if (!form.title || !form.clay) return;
+                    console.log('🏺 Project create button clicked!');
+                    console.log('🏺 Form state:', { title: form.title, clay: form.clay });
+                    console.log('🏺 Auth state:', { user: user, userId: user?.id, isAuthenticated });
+
+                    if (!form.title || !form.clay) {
+                      console.log('🏺 Form validation failed - missing title or clay');
+                      alert('Please fill in both piece name and clay body');
+                      return;
+                    }
+
+                    if (isSupabaseConfigured() && !offlineMode && !user?.id) {
+                      console.error('🏺 No user ID available!');
+                      alert('You must be logged in to create a piece. User ID is missing.');
+                      return;
+                    }
+
                     try {
+                      console.log('🏺 Creating project...', { isSupabaseConfigured: isSupabaseConfigured(), offlineMode, hasPhoto: !!form.photoFile });
                       if (isSupabaseConfigured() && !offlineMode) {
-                        const newProject = await projectsApi.create({ title: form.title, clay: form.clay, stage: 'wedging' });
+                        console.log('🏺 Using Supabase to create project, user.id:', user?.id);
+                        const newProject = await projectsApi.create({ title: form.title, clay: form.clay, stage: 'wedging' }, user?.id);
+                        console.log('🏺 Project created:', newProject);
+
+                        // Upload photo if one was selected
+                        let photos = [];
+                        if (form.photoFile) {
+                          console.log('🏺 Uploading photo...');
+                          try {
+                            const photo = await projectsApi.addPhoto(newProject.id, form.photoFile, 'wedging', user?.id);
+                            console.log('🏺 Photo uploaded:', photo);
+                            photos = [{ id: photo.id, url: photo.url, storage_path: photo.storage_path }];
+                          } catch (photoError) {
+                            console.error('🏺 Photo upload failed:', photoError);
+                            // Continue without photo - project was still created
+                          }
+                        }
+
                         setProjects([{
                           id: newProject.id,
                           title: newProject.title,
                           clay: newProject.clay_body,
                           stage: newProject.stage,
                           date: newProject.created_at?.split('T')[0],
-                          photos: [],
+                          photos: photos,
                           notes: {}
                         }, ...projects]);
                       } else {
+                        console.log('🏺 Using localStorage to create project');
                         setProjects([{ id: Date.now().toString(), title: form.title, clay: form.clay, stage: 'wedging', date: new Date().toISOString().split('T')[0], photos: form.photo ? [{ id: Date.now().toString(), url: form.photo }] : [], notes: {} }, ...projects]);
                       }
-                      setForm({ title: '', clay: '', name: '', type: '', recipe: '', photo: null, weight: '', source: '', batchNotes: '', tipCategory: 'clay_reclaim', tipTitle: '', tipContent: '', tipTags: [] });
+                      setForm({ title: '', clay: '', name: '', type: '', recipe: '', photo: null, photoFile: null, weight: '', source: '', batchNotes: '', tipCategory: 'clay_reclaim', tipTitle: '', tipContent: '', tipTags: [], guildName: '', guildLocation: '', guildDesc: '', inviteCode: '', guildPost: '', resourceTitle: '', resourceType: 'PDF', resourceUrl: '', resourceFile: null, feedback: '' });
                       setShowModal(false);
+                      console.log('🏺 Project creation complete');
                     } catch (error) {
-                      console.error('Error creating project:', error);
-                      alert('Failed to create project');
+                      console.error('🏺 Error creating project:', error);
+                      alert('Failed to create project: ' + (error.message || 'Unknown error'));
                     }
                   }} disabled={!form.title || !form.clay} className="flex-1 px-4 py-2 bg-accent text-white rounded-xl disabled:bg-stone-300">Create</button>
                 </div>
@@ -1195,13 +1448,53 @@ function CoastalKilnApp() {
                 <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Glaze name" className="w-full px-3 py-2 border border-stone-200 rounded-xl" />
                 <input type="text" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} placeholder="Firing type" className="w-full px-3 py-2 border border-stone-200 rounded-xl" />
                 <textarea value={form.recipe} onChange={(e) => setForm({ ...form, recipe: e.target.value })} placeholder="Recipe..." rows={4} className="w-full px-3 py-2 border border-stone-200 rounded-xl" />
-                <div className="flex gap-3">
-                  <button onClick={() => { setShowModal(false); setForm({ title: '', clay: '', name: '', type: '', recipe: '', photo: null, weight: '', source: '', batchNotes: '', tipCategory: 'clay_reclaim', tipTitle: '', tipContent: '', tipTags: [] }); }} className="flex-1 px-4 py-2 border border-stone-200 rounded-xl">Cancel</button>
-                  <button onClick={() => {
-                    if (!form.name || !form.type) return;
-                    setGlazes([{ id: Date.now().toString(), name: form.name, type: form.type, recipe: form.recipe, notes: '', tiles: [] }, ...glazes]);
-                    setForm({ title: '', clay: '', name: '', type: '', recipe: '', photo: null, weight: '', source: '', batchNotes: '', tipCategory: 'clay_reclaim', tipTitle: '', tipContent: '', tipTags: [] });
-                    setShowModal(false);
+                <div className="flex gap-3" onClick={(e) => {
+                  console.log('🎨 Button container clicked. Button disabled?', !form.name || !form.type);
+                  console.log('🎨 Current form values:', { name: form.name, type: form.type });
+                }}>
+                  <button onClick={() => { setShowModal(false); setForm({ title: '', clay: '', name: '', type: '', recipe: '', photo: null, photoFile: null, weight: '', source: '', batchNotes: '', tipCategory: 'clay_reclaim', tipTitle: '', tipContent: '', tipTags: [], guildName: '', guildLocation: '', guildDesc: '', inviteCode: '', guildPost: '', resourceTitle: '', resourceType: 'PDF', resourceUrl: '', resourceFile: null, feedback: '' }); }} className="flex-1 px-4 py-2 border border-stone-200 rounded-xl">Cancel</button>
+                  <button onClick={async () => {
+                    console.log('🎨 Glaze create button clicked!');
+                    console.log('🎨 Form state:', { name: form.name, type: form.type, recipe: form.recipe });
+                    console.log('🎨 Auth state:', { user: user, userId: user?.id, isAuthenticated });
+
+                    if (!form.name || !form.type) {
+                      console.log('🎨 Form validation failed - missing name or type');
+                      alert('Please fill in both glaze name and firing type');
+                      return;
+                    }
+
+                    if (isSupabaseConfigured() && !offlineMode && !user?.id) {
+                      console.error('🎨 No user ID available!');
+                      alert('You must be logged in to create a glaze. User ID is missing.');
+                      return;
+                    }
+
+                    try {
+                      console.log('🎨 Creating glaze...', { isSupabaseConfigured: isSupabaseConfigured(), offlineMode });
+                      if (isSupabaseConfigured() && !offlineMode) {
+                        console.log('🎨 Using Supabase to create glaze, user.id:', user?.id);
+                        const newGlaze = await glazesApi.create({ name: form.name, type: form.type, recipe: form.recipe, notes: '' }, user?.id);
+                        console.log('🎨 Glaze created:', newGlaze);
+                        setGlazes([{
+                          id: newGlaze.id,
+                          name: newGlaze.name,
+                          type: newGlaze.firing_type,
+                          recipe: newGlaze.recipe || '',
+                          notes: newGlaze.notes || '',
+                          tiles: []
+                        }, ...glazes]);
+                      } else {
+                        console.log('🎨 Using localStorage to create glaze');
+                        setGlazes([{ id: Date.now().toString(), name: form.name, type: form.type, recipe: form.recipe, notes: '', tiles: [] }, ...glazes]);
+                      }
+                      setForm({ title: '', clay: '', name: '', type: '', recipe: '', photo: null, photoFile: null, weight: '', source: '', batchNotes: '', tipCategory: 'clay_reclaim', tipTitle: '', tipContent: '', tipTags: [], guildName: '', guildLocation: '', guildDesc: '', inviteCode: '', guildPost: '', resourceTitle: '', resourceType: 'PDF', resourceUrl: '', resourceFile: null, feedback: '' });
+                      setShowModal(false);
+                      console.log('🎨 Glaze creation complete');
+                    } catch (error) {
+                      console.error('🎨 Error creating glaze:', error);
+                      alert('Failed to create glaze: ' + (error.message || 'Unknown error'));
+                    }
                   }} disabled={!form.name || !form.type} className="flex-1 px-4 py-2 bg-accent text-white rounded-xl disabled:bg-stone-300">Create</button>
                 </div>
               </div>

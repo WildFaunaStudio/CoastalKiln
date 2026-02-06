@@ -54,26 +54,44 @@ export const glazes = {
   },
 
   // Create new glaze
-  async create(glaze) {
-    if (!supabase) throw new Error('Supabase not configured');
+  async create(glaze, userId) {
+    console.log('🎨 glazesApi.create called');
+    console.log('🎨 Glaze data:', JSON.stringify(glaze));
+    console.log('🎨 User ID:', userId);
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('Not authenticated');
+    if (!supabase) {
+      console.error('🎨 ERROR: Supabase not configured');
+      throw new Error('Supabase not configured');
+    }
+    if (!userId) {
+      console.error('🎨 ERROR: User ID is required but was:', userId);
+      throw new Error('User ID required');
+    }
+
+    console.log('🎨 Inserting glaze into Supabase...');
+    const insertData = {
+      user_id: userId,
+      name: glaze.name,
+      firing_type: glaze.type,
+      recipe: glaze.recipe,
+      notes: glaze.notes,
+      is_public: glaze.isPublic || false,
+    };
+    console.log('🎨 Insert payload:', JSON.stringify(insertData));
 
     const { data, error } = await supabase
       .from('glazes')
-      .insert({
-        user_id: user.id,
-        name: glaze.name,
-        firing_type: glaze.type,
-        recipe: glaze.recipe,
-        notes: glaze.notes,
-        is_public: glaze.isPublic || false,
-      })
+      .insert(insertData)
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('🎨 Supabase INSERT ERROR:', error.message);
+      console.error('🎨 Error details:', JSON.stringify(error));
+      throw error;
+    }
+
+    console.log('🎨 Glaze created successfully:', data);
     return data;
   },
 
@@ -111,14 +129,12 @@ export const glazes = {
   },
 
   // Add test tile photo
-  async addTile(glazeId, file, clayBody = null, firingNotes = null) {
+  async addTile(glazeId, file, clayBody = null, firingNotes = null, userId = null) {
     if (!supabase) throw new Error('Supabase not configured');
-
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('Not authenticated');
+    if (!userId) throw new Error('User ID required');
 
     const fileExt = file.name.split('.').pop();
-    const fileName = `${user.id}/${glazeId}/${Date.now()}.${fileExt}`;
+    const fileName = `${userId}/${glazeId}/${Date.now()}.${fileExt}`;
 
     // Upload to storage
     const { error: uploadError } = await supabase.storage

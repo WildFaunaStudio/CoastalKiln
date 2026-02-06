@@ -15,8 +15,11 @@ export function AuthProvider({ children }) {
 
   // Initialize auth state
   useEffect(() => {
+    console.log('🔐 AuthContext: Starting initialization');
+    console.log('🔐 AuthContext: isSupabaseConfigured =', isSupabaseConfigured());
+
     if (!isSupabaseConfigured()) {
-      // Offline mode - use localStorage
+      console.log('🔐 AuthContext: Offline mode - using localStorage');
       const localProfile = storage.get('user', {
         username: 'Potter',
         email: '',
@@ -29,44 +32,51 @@ export function AuthProvider({ children }) {
       return;
     }
 
-    // Get initial session
-    const initAuth = async () => {
-      try {
-        const session = await auth.getSession();
-        setSession(session);
-        setUser(session?.user || null);
+    let isMounted = true;
+    let loadingSet = false;
 
-        if (session?.user) {
-          const userProfile = await profiles.get();
-          setProfile(userProfile);
-        }
-      } catch (error) {
-        console.error('Auth init error:', error);
-      } finally {
+    const setLoadingFalse = () => {
+      if (isMounted && !loadingSet) {
+        loadingSet = true;
+        console.log('🔐 AuthContext: Setting loading = false');
         setLoading(false);
       }
     };
 
-    initAuth();
-
-    // Listen for auth changes
+    // Listen for auth changes - this fires immediately with current state
     const { data: { subscription } } = auth.onAuthStateChange(async (event, session) => {
+      console.log('🔐 AuthContext: Auth state changed, event =', event, 'session =', session ? 'exists' : 'null');
+      if (!isMounted) return;
+
       setSession(session);
       setUser(session?.user || null);
 
-      if (event === 'SIGNED_IN' && session?.user) {
+      if (session?.user) {
+        console.log('🔐 AuthContext: User found, fetching profile...');
         try {
           const userProfile = await profiles.get();
-          setProfile(userProfile);
+          console.log('🔐 AuthContext: Profile fetched:', userProfile?.username);
+          if (isMounted) setProfile(userProfile);
         } catch (error) {
-          console.error('Error fetching profile:', error);
+          console.error('🔐 AuthContext: Error fetching profile:', error);
         }
-      } else if (event === 'SIGNED_OUT') {
+      } else {
         setProfile(null);
       }
+
+      // Set loading false after handling auth state
+      setLoadingFalse();
     });
 
+    // Fallback timeout in case onAuthStateChange doesn't fire
+    const timeout = setTimeout(() => {
+      console.log('🔐 AuthContext: Timeout reached, forcing loading = false');
+      setLoadingFalse();
+    }, 3000);
+
     return () => {
+      isMounted = false;
+      clearTimeout(timeout);
       subscription?.unsubscribe();
     };
   }, []);

@@ -7,30 +7,40 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Primary backgrounds
-        cream: '#F5F1E8',
+        // Primary background
+        cream: '#F0EEE8',
 
-        // Feature card backgrounds
+        // Navigation button colors
+        nav: {
+          pieces: '#BC978A',
+          glaze: '#6D72C3',
+          reclaim: '#FF8C42',
+          tips: '#4A5240',
+          guilds: '#06A77D',
+          discover: '#07C592',
+        },
+
+        // Card backgrounds (white for internal selections)
         card: {
-          pieces: '#C4A77D',
-          glaze: '#7DD3C4',
-          reclaim: '#B8D4B8',
-          guilds: '#D4B8B8',
-          kiln: '#D4C4A8',
-          tips: '#A8C4D4',
+          DEFAULT: '#FFFFFF',
+          pieces: '#BC978A',
+          glaze: '#6D72C3',
+          reclaim: '#FF8C42',
+          tips: '#4A5240',
+          guilds: '#06A77D',
         },
 
         // Text colors
         text: {
           primary: '#2D2A26',
-          secondary: '#8B7355',
-          muted: '#6B6560',
+          secondary: '#5C5C5C',
+          muted: '#8B8B8B',
         },
 
-        // Accent
+        // Accent (using guilds teal as primary accent)
         accent: {
-          DEFAULT: '#D4A574',
-          hover: '#C49464',
+          DEFAULT: '#06A77D',
+          hover: '#059669',
         },
       },
       fontFamily: {

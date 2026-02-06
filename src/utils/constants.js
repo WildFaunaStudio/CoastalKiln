@@ -33,6 +33,7 @@ export const TIP_CATEGORIES = [
   { value: 'clay_reclaim', label: 'Clay Reclaim' },
   { value: 'diy_tools', label: 'DIY Tools' },
   { value: 'plaster_bats', label: 'Plaster Bats' },
+  { value: 'other', label: 'Other' },
 ];
 
 export const RESOURCE_TYPES = ['PDF', 'Link', 'Video'];

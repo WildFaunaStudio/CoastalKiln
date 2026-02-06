@@ -246,7 +246,7 @@ export const guilds = {
     if (error) throw error;
   },
 
-  // Add resource
+  // Add resource (with optional file upload)
   async addResource(guildId, resource) {
     if (!supabase) throw new Error('Supabase not configured');
 
@@ -261,6 +261,7 @@ export const guilds = {
         title: resource.title,
         resource_type: resource.type,
         url: resource.url,
+        storage_path: resource.storage_path || null,
       })
       .select()
       .single();
@@ -269,9 +270,66 @@ export const guilds = {
     return data;
   },
 
-  // Delete resource
-  async deleteResource(resourceId) {
+  // Upload resource file to storage
+  async uploadResource(guildId, file, title) {
     if (!supabase) throw new Error('Supabase not configured');
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
+
+    // Create unique filename with timestamp
+    const timestamp = Date.now();
+    const ext = file.name.split('.').pop();
+    const storagePath = `${guildId}/${timestamp}.${ext}`;
+
+    // Upload file to guild-resources bucket
+    const { error: uploadError } = await supabase.storage
+      .from('guild-resources')
+      .upload(storagePath, file);
+
+    if (uploadError) throw uploadError;
+
+    // Get public URL for the file
+    const { data: urlData } = supabase.storage
+      .from('guild-resources')
+      .getPublicUrl(storagePath);
+
+    // Determine resource type based on file extension
+    const resourceType = ext?.toLowerCase() === 'pdf' ? 'PDF' : 'File';
+
+    // Insert record into guild_resources table
+    const { data, error } = await supabase
+      .from('guild_resources')
+      .insert({
+        guild_id: guildId,
+        added_by: user.id,
+        title: title,
+        resource_type: resourceType,
+        url: urlData.publicUrl,
+        storage_path: storagePath,
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  // Delete resource (including storage file if present)
+  async deleteResource(resourceId, storagePath = null) {
+    if (!supabase) throw new Error('Supabase not configured');
+
+    // If storage path provided, delete file from storage first
+    if (storagePath) {
+      const { error: storageError } = await supabase.storage
+        .from('guild-resources')
+        .remove([storagePath]);
+
+      if (storageError) {
+        console.error('Error deleting resource file:', storageError);
+        // Continue to delete record even if file deletion fails
+      }
+    }
 
     const { error } = await supabase
       .from('guild_resources')

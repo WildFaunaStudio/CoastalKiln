@@ -21,6 +21,18 @@ self.addEventListener('install', (event) => {
 
 // Fetch from cache when offline
 self.addEventListener('fetch', (event) => {
+  const url = new URL(event.request.url);
+
+  // Skip caching for Supabase API requests - let them pass through directly
+  if (url.hostname.includes('supabase.co')) {
+    return; // Don't intercept, let the browser handle it normally
+  }
+
+  // Skip caching for non-GET requests
+  if (event.request.method !== 'GET') {
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request)
       .then((response) => {

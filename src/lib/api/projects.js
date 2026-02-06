@@ -37,16 +37,14 @@ export const projects = {
   },
 
   // Create new project
-  async create(project) {
+  async create(project, userId) {
     if (!supabase) throw new Error('Supabase not configured');
-
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('Not authenticated');
+    if (!userId) throw new Error('User ID required');
 
     const { data, error } = await supabase
       .from('projects')
       .insert({
-        user_id: user.id,
+        user_id: userId,
         title: project.title,
         clay_body: project.clay,
         stage: project.stage || 'wedging',
@@ -95,20 +93,30 @@ export const projects = {
   },
 
   // Add photo to project
-  async addPhoto(projectId, file, stage = null) {
-    if (!supabase) throw new Error('Supabase not configured');
+  async addPhoto(projectId, file, stage = null, userId = null) {
+    console.log('📷 addPhoto called:', { projectId, fileName: file?.name, stage, userId });
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('Not authenticated');
+    if (!supabase) throw new Error('Supabase not configured');
+    if (!userId) throw new Error('User ID required');
+
+    // Check session before upload
+    const { data: { session } } = await supabase.auth.getSession();
+    console.log('📷 Session for upload:', session ? `Valid (${session.user?.id})` : 'NO SESSION');
+    if (!session) {
+      console.error('📷 No session - storage upload will fail due to RLS');
+    }
 
     const fileExt = file.name.split('.').pop();
-    const fileName = `${user.id}/${projectId}/${Date.now()}.${fileExt}`;
+    const fileName = `${userId}/${projectId}/${Date.now()}.${fileExt}`;
+    console.log('📷 Upload path:', fileName);
 
     // Upload to storage
-    const { error: uploadError } = await supabase.storage
+    console.log('📷 Starting upload...');
+    const { error: uploadError, data: uploadData } = await supabase.storage
       .from('project-photos')
       .upload(fileName, file);
 
+    console.log('📷 Upload result:', { error: uploadError, data: uploadData });
     if (uploadError) throw uploadError;
 
     // Get public URL
