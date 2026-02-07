@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     
     <!-- PWA Meta Tags -->
-    <meta name="theme-color" content="#FF6B35" />
+    <meta name="theme-color" content="#06A77D" />
     <meta name="description" content="Coastal Kiln - Your pottery companion for tracking pieces, glazes, and sustainable clay reclaim" />
     
     <!-- Apple Touch Icon -->
@@ -26,15 +26,17 @@
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
     
-    <!-- Service Worker DISABLED for debugging -->
+    <!-- Service Worker for PWA -->
     <script>
-      // Unregister any existing service workers
       if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then(function(registrations) {
-          for(let registration of registrations) {
-            registration.unregister();
-            console.log('SW unregistered:', registration);
-          }
+        window.addEventListener('load', function() {
+          navigator.serviceWorker.register('/service-worker.js')
+            .then(function(registration) {
+              console.log('SW registered:', registration);
+            })
+            .catch(function(error) {
+              console.log('SW registration failed:', error);
+            });
         });
       }
     </script>

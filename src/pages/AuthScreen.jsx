@@ -71,9 +71,9 @@ function AuthScreen({ onAuth, isOnline }) {
         {/* Logo */}
         <div className="text-center mb-8">
           <img
-            src="/CoastalKilnLogo.png"
+            src="/login-image.png"
             alt="Coastal Kiln"
-            className="w-20 h-20 mx-auto mb-4"
+            className="w-full max-w-xs mx-auto mb-4"
           />
           <h1 className="text-3xl font-bold text-text-primary">Coastal Kiln</h1>
           <p className="text-text-secondary mt-1">

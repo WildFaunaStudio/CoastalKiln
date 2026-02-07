@@ -56,7 +56,7 @@ function CoastalKilnApp() {
 
   // Load projects from Supabase when authenticated
   useEffect(() => {
-    const loadProjects = async () => {
+    const loadProjects = async (retries = 3) => {
       if (!isAuthenticated) {
         setProjectsLoading(false);
         return;
@@ -65,6 +65,8 @@ function CoastalKilnApp() {
       if (isSupabaseConfigured() && !offlineMode) {
         try {
           setProjectsLoading(true);
+          // Add delay to let Supabase initialize
+          await new Promise(r => setTimeout(r, 200));
           const data = await projectsApi.list();
           // Transform Supabase data to match app format
           const transformed = data.map(p => ({
@@ -75,10 +77,16 @@ function CoastalKilnApp() {
             date: p.created_at?.split('T')[0],
             photos: p.photos || [],
             notes: (p.notes || []).reduce((acc, n) => ({ ...acc, [n.stage]: n.content }), {}),
+            glazeIds: p.glaze_ids || [],
           }));
           setProjects(transformed);
         } catch (error) {
-          console.error('Error loading projects:', error);
+          if (error.name === 'AbortError' && retries > 0) {
+            console.log(`🔄 Retrying loadProjects (${retries} left)...`);
+            await new Promise(r => setTimeout(r, 500));
+            return loadProjects(retries - 1);
+          }
+          console.error('Error loading projects:', error?.message || error?.code || JSON.stringify(error));
           // Fallback to localStorage
           setProjects(storage.get('projects', []));
         } finally {
@@ -96,7 +104,7 @@ function CoastalKilnApp() {
 
   // Load glazes from Supabase when authenticated
   useEffect(() => {
-    const loadGlazes = async () => {
+    const loadGlazes = async (retries = 3) => {
       if (!isAuthenticated) {
         setGlazesLoading(false);
         return;
@@ -105,6 +113,8 @@ function CoastalKilnApp() {
       if (isSupabaseConfigured() && !offlineMode) {
         try {
           setGlazesLoading(true);
+          // Add delay to let Supabase initialize
+          await new Promise(r => setTimeout(r, 300));
           const data = await glazesApi.list();
           // Transform Supabase data to match app format
           const transformed = data.map(g => ({
@@ -121,7 +131,12 @@ function CoastalKilnApp() {
           }));
           setGlazes(transformed);
         } catch (error) {
-          console.error('Error loading glazes:', error);
+          if (error.name === 'AbortError' && retries > 0) {
+            console.log(`🔄 Retrying loadGlazes (${retries} left)...`);
+            await new Promise(r => setTimeout(r, 500));
+            return loadGlazes(retries - 1);
+          }
+          console.error('Error loading glazes:', error?.message || error?.code || JSON.stringify(error));
           // Fallback to localStorage
           setGlazes(storage.get('glazes', []));
         } finally {
@@ -155,7 +170,7 @@ function CoastalKilnApp() {
   const [expandedTips, setExpandedTips] = useState({ clay_reclaim: true, diy_tools: false, plaster_bats: false, other: false });
   const [tipsViewMode, setTipsViewMode] = useState('grouped'); // 'grouped' | 'flat'
 
-  const [form, setForm] = useState({ title: '', clay: '', name: '', type: '', recipe: '', photo: null, photoFile: null, weight: '', source: '', batchNotes: '', tipCategory: 'clay_reclaim', tipTitle: '', tipContent: '', tipTags: [], guildName: '', guildLocation: '', guildDesc: '', inviteCode: '', guildPost: '', resourceTitle: '', resourceType: 'PDF', resourceUrl: '', resourceFile: null, feedback: '' });
+  const [form, setForm] = useState({ title: '', clay: '', name: '', type: '', recipe: '', photo: null, photoFile: null, weight: '', source: '', batchNotes: '', tipCategory: 'clay_reclaim', tipTitle: '', tipContent: '', tipTags: [], guildName: '', guildLocation: '', guildDesc: '', inviteCode: '', guildPost: '', resourceTitle: '', resourceType: 'PDF', resourceUrl: '', resourceFile: null, feedback: '', pieceStage: 'wedging', pieceGlazes: [], customGlaze: '' });
 
   const stages = ['wedging', 'throwing', 'trimming', 'drying', 'bisque', 'glazing', 'firing', 'complete'];
 
@@ -253,8 +268,7 @@ function CoastalKilnApp() {
     return (
       <div className="min-h-screen bg-cream flex items-center justify-center">
         <div className="flex flex-col items-center">
-          <img src="/CoastalKilnLogo.png" alt="Coastal Kiln" className="w-24 h-24 animate-spin-slow" />
-          <p className="mt-4 text-text-secondary">Loading...</p>
+          <img src="/loading.gif" alt="Loading" className="w-32 h-32" />
         </div>
       </div>
     );
@@ -555,8 +569,8 @@ function CoastalKilnApp() {
                   <h3 className={`font-semibold text-lg ${sustainableTab === 'reclaim' ? 'text-white' : 'text-text-primary'}`}>Clay Reclaim</h3>
                 </button>
 
-                <button onClick={() => setSustainableTab('tips')} className={`p-6 rounded-2xl text-left transition-all bg-nav-tips ${sustainableTab === 'tips' ? 'shadow-lg' : 'shadow-sm opacity-80'}`}>
-                  <h3 className="font-semibold text-lg text-white">Studio Tips</h3>
+                <button onClick={() => setSustainableTab('tips')} className={`p-6 rounded-2xl text-left transition-all ${sustainableTab === 'tips' ? 'bg-nav-tips shadow-lg' : 'bg-white shadow-sm'}`}>
+                  <h3 className={`font-semibold text-lg ${sustainableTab === 'tips' ? 'text-white' : 'text-text-primary'}`}>Studio Tips</h3>
                 </button>
               </div>
             </div>
@@ -870,7 +884,7 @@ function CoastalKilnApp() {
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="bg-cream rounded-2xl p-6 shadow-sm">
+                <div className="mb-2">
                   <h3 className="font-semibold text-text-primary mb-3">Have an Invite Code?</h3>
                   <button onClick={() => setShowModal(true)} className="w-full px-4 py-3 bg-accent text-white rounded-xl hover:bg-accent-hover font-medium">
                     Join by Invite Code
@@ -912,18 +926,18 @@ function CoastalKilnApp() {
               <h1 className="text-4xl font-bold text-text-primary mb-6">What are we making today?</h1>
 
               <div className="grid grid-cols-2 gap-3">
-                <button onClick={() => setTab('pieces')} className={`p-6 rounded-2xl text-left transition-all bg-nav-pieces ${tab === 'pieces' ? 'shadow-lg' : 'shadow-sm opacity-80'}`}>
-                  <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center mb-3">
-                    <Flame size={22} className="text-nav-pieces" />
+                <button onClick={() => setTab('pieces')} className={`p-6 rounded-2xl text-left transition-all ${tab === 'pieces' ? 'bg-nav-pieces shadow-lg' : 'bg-white shadow-sm'}`}>
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-3 ${tab === 'pieces' ? 'bg-white' : 'bg-nav-pieces'}`}>
+                    <Flame size={22} className={tab === 'pieces' ? 'text-nav-pieces' : 'text-white'} />
                   </div>
-                  <h3 className="font-semibold text-text-primary text-lg">Pieces</h3>
+                  <h3 className={`font-semibold text-lg ${tab === 'pieces' ? 'text-text-primary' : 'text-text-primary'}`}>Pieces</h3>
                 </button>
 
-                <button onClick={() => setTab('glazes')} className={`p-6 rounded-2xl text-left transition-all bg-nav-glaze ${tab === 'glazes' ? 'shadow-lg' : 'shadow-sm opacity-80'}`}>
-                  <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center mb-3">
-                    <Palette size={22} className="text-nav-glaze" />
+                <button onClick={() => setTab('glazes')} className={`p-6 rounded-2xl text-left transition-all ${tab === 'glazes' ? 'bg-nav-glaze shadow-lg' : 'bg-white shadow-sm'}`}>
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-3 ${tab === 'glazes' ? 'bg-white' : 'bg-nav-glaze'}`}>
+                    <Palette size={22} className={tab === 'glazes' ? 'text-nav-glaze' : 'text-white'} />
                   </div>
-                  <h3 className="font-semibold text-white text-lg">Glaze Garden</h3>
+                  <h3 className={`font-semibold text-lg ${tab === 'glazes' ? 'text-white' : 'text-text-primary'}`}>Glaze Garden</h3>
                 </button>
               </div>
             </div>
@@ -931,18 +945,25 @@ function CoastalKilnApp() {
             {/* Content */}
             {tab === 'pieces' ? (
               <div className="grid grid-cols-2 gap-3">
-                {projects.map(p => (
-                  <button key={p.id} onClick={() => setSelected(p)} className="bg-white rounded-2xl p-3 hover:shadow-md text-left shadow-sm">
-                    <div className="aspect-square bg-cream rounded-xl mb-2 flex items-center justify-center overflow-hidden">
-                      {p.photos.length > 0 ? <img src={p.photos[0].url} alt={p.title} className="w-full h-full object-cover" /> : <Flame size={32} className="text-text-muted" />}
-                    </div>
-                    <h3 className="font-semibold text-text-primary text-sm truncate">{p.title}</h3>
-                    <p className="text-xs text-text-secondary">{p.clay}</p>
-                    <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium mt-2 ${stageColors[p.stage]}`}>
-                      {formatStage(p.stage)}
-                    </span>
-                  </button>
-                ))}
+                {projects.map(p => {
+                  const pieceGlazes = (p.glazeIds || []).map(id => glazes.find(g => g.id === id)).filter(Boolean);
+                  const allGlazeNames = [...pieceGlazes.map(g => g.name), p.customGlaze].filter(Boolean);
+                  return (
+                    <button key={p.id} onClick={() => setSelected(p)} className="bg-white rounded-2xl p-3 hover:shadow-md text-left shadow-sm">
+                      <div className="aspect-square bg-cream rounded-xl mb-2 flex items-center justify-center overflow-hidden">
+                        {p.photos.length > 0 ? <img src={p.photos[0].url} alt={p.title} className="w-full h-full object-cover" /> : <Flame size={32} className="text-text-muted" />}
+                      </div>
+                      <h3 className="font-semibold text-text-primary text-sm truncate">{p.title}</h3>
+                      <p className="text-xs text-text-secondary">{p.clay}</p>
+                      <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium mt-2 ${stageColors[p.stage]}`}>
+                        {formatStage(p.stage)}
+                      </span>
+                      {allGlazeNames.length > 0 && (
+                        <p className="text-xs text-nav-glaze mt-1 truncate">{allGlazeNames.join(', ')}</p>
+                      )}
+                    </button>
+                  );
+                })}
                 {projects.length === 0 && (
                   <div className="col-span-2 text-center py-12 bg-white rounded-2xl shadow-sm">
                     <Flame size={48} className="mx-auto text-text-muted mb-3" />
@@ -1020,7 +1041,7 @@ function CoastalKilnApp() {
                 <label className="flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-stone-300 rounded-xl text-text-secondary hover:border-accent cursor-pointer">
                   <Camera size={20} />
                   <span className="font-medium">Add Photo</span>
-                  <input type="file" accept="image/*" onChange={(e) => handlePhotoUpload(e, 'project')} className="hidden" />
+                  <input type="file" accept="image/*" capture="environment" onChange={(e) => handlePhotoUpload(e, 'project')} className="hidden" />
                 </label>
               </div>
 
@@ -1076,7 +1097,7 @@ function CoastalKilnApp() {
               <label className="flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-stone-300 rounded-xl text-text-secondary hover:border-accent cursor-pointer">
                 <Camera size={20} />
                 <span className="font-medium">Add Test Tile</span>
-                <input type="file" accept="image/*" onChange={(e) => handlePhotoUpload(e, 'glaze')} className="hidden" />
+                <input type="file" accept="image/*" capture="environment" onChange={(e) => handlePhotoUpload(e, 'glaze')} className="hidden" />
               </label>
             </div>
 
@@ -1140,7 +1161,7 @@ function CoastalKilnApp() {
                  currentView === 'sustainable' && sustainableTab === 'tips' ? 'New Studio Tip' :
                  tab === 'pieces' ? 'New Piece' : 'New Glaze'}
               </h2>
-              <button onClick={() => { setShowModal(false); setModalType(null); setForm({ title: '', clay: '', name: '', type: '', recipe: '', photo: null, photoFile: null, weight: '', source: '', batchNotes: '', tipCategory: 'clay_reclaim', tipTitle: '', tipContent: '', tipTags: [], guildName: '', guildLocation: '', guildDesc: '', inviteCode: '', guildPost: '', resourceTitle: '', resourceType: 'PDF', resourceUrl: '', resourceFile: null, feedback: '' }); }}>
+              <button onClick={() => { setShowModal(false); setModalType(null); setForm({ title: '', clay: '', name: '', type: '', recipe: '', photo: null, photoFile: null, weight: '', source: '', batchNotes: '', tipCategory: 'clay_reclaim', tipTitle: '', tipContent: '', tipTags: [], guildName: '', guildLocation: '', guildDesc: '', inviteCode: '', guildPost: '', resourceTitle: '', resourceType: 'PDF', resourceUrl: '', resourceFile: null, feedback: '', pieceStage: 'wedging', pieceGlazes: [], customGlaze: '' }); }}>
                 <X size={24} />
               </button>
             </div>
@@ -1311,11 +1332,11 @@ function CoastalKilnApp() {
                   <textarea value={form.batchNotes} onChange={(e) => setForm({ ...form, batchNotes: e.target.value })} placeholder="Clay type, mixing notes..." rows={3} className="w-full px-3 py-2 border border-stone-200 rounded-xl" />
                 </div>
                 <div className="flex gap-3">
-                  <button onClick={() => { setShowModal(false); setForm({ title: '', clay: '', name: '', type: '', recipe: '', photo: null, photoFile: null, weight: '', source: '', batchNotes: '', tipCategory: 'clay_reclaim', tipTitle: '', tipContent: '', tipTags: [], guildName: '', guildLocation: '', guildDesc: '', inviteCode: '', guildPost: '', resourceTitle: '', resourceType: 'PDF', resourceUrl: '', resourceFile: null, feedback: '' }); }} className="flex-1 px-4 py-2 border border-stone-200 rounded-xl">Cancel</button>
+                  <button onClick={() => { setShowModal(false); setForm({ title: '', clay: '', name: '', type: '', recipe: '', photo: null, photoFile: null, weight: '', source: '', batchNotes: '', tipCategory: 'clay_reclaim', tipTitle: '', tipContent: '', tipTags: [], guildName: '', guildLocation: '', guildDesc: '', inviteCode: '', guildPost: '', resourceTitle: '', resourceType: 'PDF', resourceUrl: '', resourceFile: null, feedback: '', pieceStage: 'wedging', pieceGlazes: [], customGlaze: '' }); }} className="flex-1 px-4 py-2 border border-stone-200 rounded-xl">Cancel</button>
                   <button onClick={() => {
                     if (!form.source) return;
                     setReclaimBatches([{ id: Date.now().toString(), weight: form.weight ? parseFloat(form.weight) : null, source: form.source, date: new Date().toISOString().split('T')[0], status: 'drying', notes: form.batchNotes }, ...reclaimBatches]);
-                    setForm({ title: '', clay: '', name: '', type: '', recipe: '', photo: null, photoFile: null, weight: '', source: '', batchNotes: '', tipCategory: 'clay_reclaim', tipTitle: '', tipContent: '', tipTags: [], guildName: '', guildLocation: '', guildDesc: '', inviteCode: '', guildPost: '', resourceTitle: '', resourceType: 'PDF', resourceUrl: '', resourceFile: null, feedback: '' });
+                    setForm({ title: '', clay: '', name: '', type: '', recipe: '', photo: null, photoFile: null, weight: '', source: '', batchNotes: '', tipCategory: 'clay_reclaim', tipTitle: '', tipContent: '', tipTags: [], guildName: '', guildLocation: '', guildDesc: '', inviteCode: '', guildPost: '', resourceTitle: '', resourceType: 'PDF', resourceUrl: '', resourceFile: null, feedback: '', pieceStage: 'wedging', pieceGlazes: [], customGlaze: '' });
                     setShowModal(false);
                   }} disabled={!form.source} className="flex-1 px-4 py-2 bg-accent text-white rounded-xl disabled:bg-stone-300">Create</button>
                 </div>
@@ -1344,11 +1365,11 @@ function CoastalKilnApp() {
                   <input type="text" value={form.tipTags.join(', ')} onChange={(e) => setForm({ ...form, tipTags: e.target.value.split(',').map(t => t.trim()).filter(t => t) })} placeholder="e.g., Water Conservation, Energy" className="w-full px-3 py-2 border border-stone-200 rounded-xl" />
                 </div>
                 <div className="flex gap-3">
-                  <button onClick={() => { setShowModal(false); setForm({ title: '', clay: '', name: '', type: '', recipe: '', photo: null, photoFile: null, weight: '', source: '', batchNotes: '', tipCategory: 'clay_reclaim', tipTitle: '', tipContent: '', tipTags: [], guildName: '', guildLocation: '', guildDesc: '', inviteCode: '', guildPost: '', resourceTitle: '', resourceType: 'PDF', resourceUrl: '', resourceFile: null, feedback: '' }); }} className="flex-1 px-4 py-2 border border-stone-200 rounded-xl">Cancel</button>
+                  <button onClick={() => { setShowModal(false); setForm({ title: '', clay: '', name: '', type: '', recipe: '', photo: null, photoFile: null, weight: '', source: '', batchNotes: '', tipCategory: 'clay_reclaim', tipTitle: '', tipContent: '', tipTags: [], guildName: '', guildLocation: '', guildDesc: '', inviteCode: '', guildPost: '', resourceTitle: '', resourceType: 'PDF', resourceUrl: '', resourceFile: null, feedback: '', pieceStage: 'wedging', pieceGlazes: [], customGlaze: '' }); }} className="flex-1 px-4 py-2 border border-stone-200 rounded-xl">Cancel</button>
                   <button onClick={() => {
                     if (!form.tipTitle || !form.tipContent) return;
                     setStudioTips([...studioTips, { id: Date.now().toString(), category: form.tipCategory, title: form.tipTitle, content: form.tipContent, tags: form.tipTags }]);
-                    setForm({ title: '', clay: '', name: '', type: '', recipe: '', photo: null, photoFile: null, weight: '', source: '', batchNotes: '', tipCategory: 'clay_reclaim', tipTitle: '', tipContent: '', tipTags: [], guildName: '', guildLocation: '', guildDesc: '', inviteCode: '', guildPost: '', resourceTitle: '', resourceType: 'PDF', resourceUrl: '', resourceFile: null, feedback: '' });
+                    setForm({ title: '', clay: '', name: '', type: '', recipe: '', photo: null, photoFile: null, weight: '', source: '', batchNotes: '', tipCategory: 'clay_reclaim', tipTitle: '', tipContent: '', tipTags: [], guildName: '', guildLocation: '', guildDesc: '', inviteCode: '', guildPost: '', resourceTitle: '', resourceType: 'PDF', resourceUrl: '', resourceFile: null, feedback: '', pieceStage: 'wedging', pieceGlazes: [], customGlaze: '' });
                     setShowModal(false);
                   }} disabled={!form.tipTitle || !form.tipContent} className="flex-1 px-4 py-2 bg-accent text-white rounded-xl disabled:bg-stone-300">Add Tip</button>
                 </div>
@@ -1366,7 +1387,7 @@ function CoastalKilnApp() {
                   <label className="flex flex-col items-center justify-center aspect-square border-2 border-dashed border-stone-300 rounded-xl cursor-pointer hover:border-accent">
                     <Camera size={48} className="text-text-muted mb-2" />
                     <span className="text-sm text-text-secondary">Add photo (optional)</span>
-                    <input type="file" accept="image/*" onChange={(e) => {
+                    <input type="file" accept="image/*" capture="environment" onChange={(e) => {
                       const file = e.target.files?.[0];
                       if (!file) return;
                       const reader = new FileReader();
@@ -1377,11 +1398,57 @@ function CoastalKilnApp() {
                 )}
                 <input type="text" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Piece name" className="w-full px-3 py-2 border border-stone-200 rounded-xl" />
                 <input type="text" value={form.clay} onChange={(e) => setForm({ ...form, clay: e.target.value })} placeholder="Clay body" className="w-full px-3 py-2 border border-stone-200 rounded-xl" />
-                <div className="flex gap-3" onClick={(e) => {
-                  console.log('🏺 Button container clicked. Button disabled?', !form.title || !form.clay);
-                  console.log('🏺 Current form values:', { title: form.title, clay: form.clay });
-                }}>
-                  <button onClick={() => { setShowModal(false); setForm({ title: '', clay: '', name: '', type: '', recipe: '', photo: null, photoFile: null, weight: '', source: '', batchNotes: '', tipCategory: 'clay_reclaim', tipTitle: '', tipContent: '', tipTags: [], guildName: '', guildLocation: '', guildDesc: '', inviteCode: '', guildPost: '', resourceTitle: '', resourceType: 'PDF', resourceUrl: '', resourceFile: null, feedback: '' }); }} className="flex-1 px-4 py-2 border border-stone-200 rounded-xl">Cancel</button>
+
+                {/* Stage selection */}
+                <div>
+                  <label className="block text-sm font-medium text-text-primary mb-1">Current Stage</label>
+                  <select value={form.pieceStage} onChange={(e) => setForm({ ...form, pieceStage: e.target.value })} className="w-full px-3 py-2 border border-stone-200 rounded-xl">
+                    <option value="wedging">Wedging</option>
+                    <option value="throwing">Throwing</option>
+                    <option value="trimming">Trimming</option>
+                    <option value="drying">Drying</option>
+                    <option value="bisque">Bisque</option>
+                    <option value="glazing">Glazing</option>
+                    <option value="firing">Firing</option>
+                    <option value="complete">Complete</option>
+                  </select>
+                </div>
+
+                {/* Glaze selection */}
+                <div>
+                  <label className="block text-sm font-medium text-text-primary mb-1">Glazes (optional)</label>
+                  {glazes.length > 0 && (
+                    <div className="space-y-2 max-h-32 overflow-y-auto border border-stone-200 rounded-xl p-2 mb-2">
+                      {glazes.map(glaze => (
+                        <label key={glaze.id} className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={form.pieceGlazes.includes(glaze.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setForm({ ...form, pieceGlazes: [...form.pieceGlazes, glaze.id] });
+                              } else {
+                                setForm({ ...form, pieceGlazes: form.pieceGlazes.filter(id => id !== glaze.id) });
+                              }
+                            }}
+                            className="w-4 h-4 text-accent rounded"
+                          />
+                          <span className="text-sm text-text-primary">{glaze.name}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                  <input
+                    type="text"
+                    value={form.customGlaze}
+                    onChange={(e) => setForm({ ...form, customGlaze: e.target.value })}
+                    placeholder="Or type a glaze name..."
+                    className="w-full px-3 py-2 border border-stone-200 rounded-xl text-sm"
+                  />
+                </div>
+
+                <div className="flex gap-3">
+                  <button onClick={() => { setShowModal(false); setForm({ title: '', clay: '', name: '', type: '', recipe: '', photo: null, photoFile: null, weight: '', source: '', batchNotes: '', tipCategory: 'clay_reclaim', tipTitle: '', tipContent: '', tipTags: [], guildName: '', guildLocation: '', guildDesc: '', inviteCode: '', guildPost: '', resourceTitle: '', resourceType: 'PDF', resourceUrl: '', resourceFile: null, feedback: '', pieceStage: 'wedging', pieceGlazes: [], customGlaze: '' }); }} className="flex-1 px-4 py-2 border border-stone-200 rounded-xl">Cancel</button>
                   <button onClick={async () => {
                     console.log('🏺 Project create button clicked!');
                     console.log('🏺 Form state:', { title: form.title, clay: form.clay });
@@ -1402,8 +1469,16 @@ function CoastalKilnApp() {
                     try {
                       console.log('🏺 Creating project...', { isSupabaseConfigured: isSupabaseConfigured(), offlineMode, hasPhoto: !!form.photoFile });
                       if (isSupabaseConfigured() && !offlineMode) {
+                        // Check Supabase session
+                        const { data: sessionData } = await import('./lib/supabase').then(m => m.supabase.auth.getSession());
+                        console.log('🧪 Supabase session:', sessionData);
+                        if (!sessionData?.session) {
+                          console.error('🏺 No Supabase session!');
+                          alert('Session expired. Please log out and log back in.');
+                          return;
+                        }
                         console.log('🏺 Using Supabase to create project, user.id:', user?.id);
-                        const newProject = await projectsApi.create({ title: form.title, clay: form.clay, stage: 'wedging' }, user?.id);
+                        const newProject = await projectsApi.create({ title: form.title, clay: form.clay, stage: form.pieceStage }, user?.id);
                         console.log('🏺 Project created:', newProject);
 
                         // Upload photo if one was selected
@@ -1411,7 +1486,7 @@ function CoastalKilnApp() {
                         if (form.photoFile) {
                           console.log('🏺 Uploading photo...');
                           try {
-                            const photo = await projectsApi.addPhoto(newProject.id, form.photoFile, 'wedging', user?.id);
+                            const photo = await projectsApi.addPhoto(newProject.id, form.photoFile, form.pieceStage, user?.id);
                             console.log('🏺 Photo uploaded:', photo);
                             photos = [{ id: photo.id, url: photo.url, storage_path: photo.storage_path }];
                           } catch (photoError) {
@@ -1427,18 +1502,20 @@ function CoastalKilnApp() {
                           stage: newProject.stage,
                           date: newProject.created_at?.split('T')[0],
                           photos: photos,
-                          notes: {}
+                          notes: {},
+                          glazeIds: form.pieceGlazes,
+                          customGlaze: form.customGlaze
                         }, ...projects]);
                       } else {
                         console.log('🏺 Using localStorage to create project');
-                        setProjects([{ id: Date.now().toString(), title: form.title, clay: form.clay, stage: 'wedging', date: new Date().toISOString().split('T')[0], photos: form.photo ? [{ id: Date.now().toString(), url: form.photo }] : [], notes: {} }, ...projects]);
+                        setProjects([{ id: Date.now().toString(), title: form.title, clay: form.clay, stage: form.pieceStage, date: new Date().toISOString().split('T')[0], photos: form.photo ? [{ id: Date.now().toString(), url: form.photo }] : [], notes: {}, glazeIds: form.pieceGlazes, customGlaze: form.customGlaze }, ...projects]);
                       }
-                      setForm({ title: '', clay: '', name: '', type: '', recipe: '', photo: null, photoFile: null, weight: '', source: '', batchNotes: '', tipCategory: 'clay_reclaim', tipTitle: '', tipContent: '', tipTags: [], guildName: '', guildLocation: '', guildDesc: '', inviteCode: '', guildPost: '', resourceTitle: '', resourceType: 'PDF', resourceUrl: '', resourceFile: null, feedback: '' });
+                      setForm({ title: '', clay: '', name: '', type: '', recipe: '', photo: null, photoFile: null, weight: '', source: '', batchNotes: '', tipCategory: 'clay_reclaim', tipTitle: '', tipContent: '', tipTags: [], guildName: '', guildLocation: '', guildDesc: '', inviteCode: '', guildPost: '', resourceTitle: '', resourceType: 'PDF', resourceUrl: '', resourceFile: null, feedback: '', pieceStage: 'wedging', pieceGlazes: [], customGlaze: '' });
                       setShowModal(false);
                       console.log('🏺 Project creation complete');
                     } catch (error) {
-                      console.error('🏺 Error creating project:', error);
-                      alert('Failed to create project: ' + (error.message || 'Unknown error'));
+                      console.error('🔥 FULL Supabase error:', error);
+                      alert('Failed to create project:\n' + JSON.stringify(error, null, 2));
                     }
                   }} disabled={!form.title || !form.clay} className="flex-1 px-4 py-2 bg-accent text-white rounded-xl disabled:bg-stone-300">Create</button>
                 </div>
@@ -1452,7 +1529,7 @@ function CoastalKilnApp() {
                   console.log('🎨 Button container clicked. Button disabled?', !form.name || !form.type);
                   console.log('🎨 Current form values:', { name: form.name, type: form.type });
                 }}>
-                  <button onClick={() => { setShowModal(false); setForm({ title: '', clay: '', name: '', type: '', recipe: '', photo: null, photoFile: null, weight: '', source: '', batchNotes: '', tipCategory: 'clay_reclaim', tipTitle: '', tipContent: '', tipTags: [], guildName: '', guildLocation: '', guildDesc: '', inviteCode: '', guildPost: '', resourceTitle: '', resourceType: 'PDF', resourceUrl: '', resourceFile: null, feedback: '' }); }} className="flex-1 px-4 py-2 border border-stone-200 rounded-xl">Cancel</button>
+                  <button onClick={() => { setShowModal(false); setForm({ title: '', clay: '', name: '', type: '', recipe: '', photo: null, photoFile: null, weight: '', source: '', batchNotes: '', tipCategory: 'clay_reclaim', tipTitle: '', tipContent: '', tipTags: [], guildName: '', guildLocation: '', guildDesc: '', inviteCode: '', guildPost: '', resourceTitle: '', resourceType: 'PDF', resourceUrl: '', resourceFile: null, feedback: '', pieceStage: 'wedging', pieceGlazes: [], customGlaze: '' }); }} className="flex-1 px-4 py-2 border border-stone-200 rounded-xl">Cancel</button>
                   <button onClick={async () => {
                     console.log('🎨 Glaze create button clicked!');
                     console.log('🎨 Form state:', { name: form.name, type: form.type, recipe: form.recipe });
@@ -1488,7 +1565,7 @@ function CoastalKilnApp() {
                         console.log('🎨 Using localStorage to create glaze');
                         setGlazes([{ id: Date.now().toString(), name: form.name, type: form.type, recipe: form.recipe, notes: '', tiles: [] }, ...glazes]);
                       }
-                      setForm({ title: '', clay: '', name: '', type: '', recipe: '', photo: null, photoFile: null, weight: '', source: '', batchNotes: '', tipCategory: 'clay_reclaim', tipTitle: '', tipContent: '', tipTags: [], guildName: '', guildLocation: '', guildDesc: '', inviteCode: '', guildPost: '', resourceTitle: '', resourceType: 'PDF', resourceUrl: '', resourceFile: null, feedback: '' });
+                      setForm({ title: '', clay: '', name: '', type: '', recipe: '', photo: null, photoFile: null, weight: '', source: '', batchNotes: '', tipCategory: 'clay_reclaim', tipTitle: '', tipContent: '', tipTags: [], guildName: '', guildLocation: '', guildDesc: '', inviteCode: '', guildPost: '', resourceTitle: '', resourceType: 'PDF', resourceUrl: '', resourceFile: null, feedback: '', pieceStage: 'wedging', pieceGlazes: [], customGlaze: '' });
                       setShowModal(false);
                       console.log('🎨 Glaze creation complete');
                     } catch (error) {

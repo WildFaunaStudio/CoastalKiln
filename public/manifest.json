@@ -4,8 +4,8 @@
   "description": "Your pottery companion - track pieces, glazes, and clay reclaim",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#F5F1ED",
-  "theme_color": "#FF6B35",
+  "background_color": "#F0EEE8",
+  "theme_color": "#06A77D",
   "orientation": "portrait",
   "icons": [
     {

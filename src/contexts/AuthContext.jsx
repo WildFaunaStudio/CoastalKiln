@@ -53,12 +53,26 @@ export function AuthProvider({ children }) {
 
       if (session?.user) {
         console.log('🔐 AuthContext: User found, fetching profile...');
+        // Add a small delay to let Supabase initialize fully
+        await new Promise(r => setTimeout(r, 100));
         try {
           const userProfile = await profiles.get();
           console.log('🔐 AuthContext: Profile fetched:', userProfile?.username);
           if (isMounted) setProfile(userProfile);
         } catch (error) {
-          console.error('🔐 AuthContext: Error fetching profile:', error);
+          if (error.name === 'AbortError') {
+            console.log('🔐 AuthContext: AbortError on profile fetch, will retry...');
+            // Retry after a delay
+            await new Promise(r => setTimeout(r, 500));
+            try {
+              const userProfile = await profiles.get();
+              if (isMounted) setProfile(userProfile);
+            } catch (retryError) {
+              console.error('🔐 AuthContext: Retry also failed:', retryError);
+            }
+          } else {
+            console.error('🔐 AuthContext: Error fetching profile:', error);
+          }
         }
       } else {
         setProfile(null);

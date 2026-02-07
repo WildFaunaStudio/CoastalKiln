@@ -1,23 +1,41 @@
 import { supabase } from '../supabase';
 
+// Helper to retry on AbortError
+const withRetry = async (fn, retries = 3) => {
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await fn();
+    } catch (error) {
+      if (error.name === 'AbortError' && i < retries - 1) {
+        console.log(`🔄 Retry ${i + 1}/${retries} after AbortError...`);
+        await new Promise(r => setTimeout(r, 200 * (i + 1)));
+        continue;
+      }
+      throw error;
+    }
+  }
+};
+
 export const glazes = {
   // Get all glazes for current user (plus public ones)
   async list() {
     if (!supabase) throw new Error('Supabase not configured');
 
-    const { data: { user } } = await supabase.auth.getUser();
+    return withRetry(async () => {
+      const { data: { user } } = await supabase.auth.getUser();
 
-    const { data, error } = await supabase
-      .from('glazes')
-      .select(`
-        *,
-        tiles:glaze_tiles(*)
-      `)
-      .or(`user_id.eq.${user?.id},is_public.eq.true`)
-      .order('updated_at', { ascending: false });
+      const { data, error } = await supabase
+        .from('glazes')
+        .select(`
+          *,
+          tiles:glaze_tiles(*)
+        `)
+        .or(`user_id.eq.${user?.id},is_public.eq.true`)
+        .order('updated_at', { ascending: false });
 
-    if (error) throw error;
-    return data;
+      if (error) throw error;
+      return data;
+    });
   },
 
   // Get user's own glazes only
@@ -68,31 +86,33 @@ export const glazes = {
       throw new Error('User ID required');
     }
 
-    console.log('🎨 Inserting glaze into Supabase...');
-    const insertData = {
-      user_id: userId,
-      name: glaze.name,
-      firing_type: glaze.type,
-      recipe: glaze.recipe,
-      notes: glaze.notes,
-      is_public: glaze.isPublic || false,
-    };
-    console.log('🎨 Insert payload:', JSON.stringify(insertData));
+    return withRetry(async () => {
+      console.log('🎨 Inserting glaze into Supabase...');
+      const insertData = {
+        user_id: userId,
+        name: glaze.name,
+        firing_type: glaze.type,
+        recipe: glaze.recipe,
+        notes: glaze.notes,
+        is_public: glaze.isPublic || false,
+      };
+      console.log('🎨 Insert payload:', JSON.stringify(insertData));
 
-    const { data, error } = await supabase
-      .from('glazes')
-      .insert(insertData)
-      .select()
-      .single();
+      const { data, error } = await supabase
+        .from('glazes')
+        .insert(insertData)
+        .select()
+        .single();
 
-    if (error) {
-      console.error('🎨 Supabase INSERT ERROR:', error.message);
-      console.error('🎨 Error details:', JSON.stringify(error));
-      throw error;
-    }
+      if (error) {
+        console.error('🎨 Supabase INSERT ERROR:', error.message);
+        console.error('🎨 Error details:', JSON.stringify(error));
+        throw error;
+      }
 
-    console.log('🎨 Glaze created successfully:', data);
-    return data;
+      console.log('🎨 Glaze created successfully:', data);
+      return data;
+    });
   },
 
   // Update glaze

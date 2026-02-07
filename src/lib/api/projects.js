@@ -1,21 +1,39 @@
 import { supabase } from '../supabase';
 
+// Helper to retry on AbortError
+const withRetry = async (fn, retries = 3) => {
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await fn();
+    } catch (error) {
+      if (error.name === 'AbortError' && i < retries - 1) {
+        console.log(`🔄 Retry ${i + 1}/${retries} after AbortError...`);
+        await new Promise(r => setTimeout(r, 200 * (i + 1)));
+        continue;
+      }
+      throw error;
+    }
+  }
+};
+
 export const projects = {
   // Get all projects for current user
   async list() {
     if (!supabase) throw new Error('Supabase not configured');
 
-    const { data, error } = await supabase
-      .from('projects')
-      .select(`
-        *,
-        photos:project_photos(*),
-        notes:project_notes(*)
-      `)
-      .order('updated_at', { ascending: false });
+    return withRetry(async () => {
+      const { data, error } = await supabase
+        .from('projects')
+        .select(`
+          *,
+          photos:project_photos(*),
+          notes:project_notes(*)
+        `)
+        .order('updated_at', { ascending: false });
 
-    if (error) throw error;
-    return data;
+      if (error) throw error;
+      return data;
+    });
   },
 
   // Get single project by ID
@@ -41,38 +59,42 @@ export const projects = {
     if (!supabase) throw new Error('Supabase not configured');
     if (!userId) throw new Error('User ID required');
 
-    const { data, error } = await supabase
-      .from('projects')
-      .insert({
-        user_id: userId,
-        title: project.title,
-        clay_body: project.clay,
-        stage: project.stage || 'wedging',
-      })
-      .select()
-      .single();
+    return withRetry(async () => {
+      const { data, error } = await supabase
+        .from('projects')
+        .insert({
+          user_id: userId,
+          title: project.title,
+          clay_body: project.clay,
+          stage: project.stage || 'wedging',
+        })
+        .select()
+        .single();
 
-    if (error) throw error;
-    return data;
+      if (error) throw error;
+      return data;
+    });
   },
 
   // Update project
   async update(id, updates) {
     if (!supabase) throw new Error('Supabase not configured');
 
-    const { data, error } = await supabase
-      .from('projects')
-      .update({
-        title: updates.title,
-        clay_body: updates.clay,
-        stage: updates.stage,
-      })
-      .eq('id', id)
-      .select()
-      .single();
+    return withRetry(async () => {
+      const { data, error } = await supabase
+        .from('projects')
+        .update({
+          title: updates.title,
+          clay_body: updates.clay,
+          stage: updates.stage,
+        })
+        .eq('id', id)
+        .select()
+        .single();
 
-    if (error) throw error;
-    return data;
+      if (error) throw error;
+      return data;
+    });
   },
 
   // Delete project

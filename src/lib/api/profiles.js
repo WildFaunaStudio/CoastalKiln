@@ -1,21 +1,39 @@
 import { supabase } from '../supabase';
 
+// Helper to retry on AbortError
+const withRetry = async (fn, retries = 3) => {
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await fn();
+    } catch (error) {
+      if (error.name === 'AbortError' && i < retries - 1) {
+        console.log(`🔄 Profile retry ${i + 1}/${retries} after AbortError...`);
+        await new Promise(r => setTimeout(r, 300 * (i + 1)));
+        continue;
+      }
+      throw error;
+    }
+  }
+};
+
 export const profiles = {
   // Get current user's profile
   async get() {
     if (!supabase) throw new Error('Supabase not configured');
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('Not authenticated');
+    return withRetry(async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
 
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single();
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
 
-    if (error) throw error;
-    return data;
+      if (error) throw error;
+      return data;
+    });
   },
 
   // Get profile by ID
