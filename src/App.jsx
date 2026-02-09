@@ -33,10 +33,14 @@ function CoastalKilnApp() {
   const [selectedBatch, setSelectedBatch] = useState(null);
   const [selectedGuild, setSelectedGuild] = useState(null);
 
-  const [projects, setProjects] = useState([]);
+  const [projects, setProjects] = useState([
+    { id: 'template', title: 'Example Mug (template)', clay: 'Stoneware', stage: 'wedging', date: new Date().toISOString().split('T')[0], photos: [], notes: {}, glazeIds: [], isTemplate: true }
+  ]);
   const [projectsLoading, setProjectsLoading] = useState(true);
 
-  const [glazes, setGlazes] = useState([]);
+  const [glazes, setGlazes] = useState([
+    { id: 'template', name: 'Example Clear Glaze (template)', type: 'oxidation', recipe: 'Feldspar 40%, Silica 30%, Whiting 20%, Kaolin 10%', notes: 'This is a sample glaze — edit or delete it!', tiles: [] }
+  ]);
   const [glazesLoading, setGlazesLoading] = useState(true);
 
   const [reclaimBatches, setReclaimBatches] = useState(() => storage.get('reclaimBatches', [
@@ -49,10 +53,15 @@ function CoastalKilnApp() {
     { id: '3', category: 'plaster_bats', title: 'Casting Plaster Bats', content: 'Use pottery #1 plaster, mix ratio 100 parts plaster to 70 parts water by weight. Pour into a level mold (bucket lids work great). Let set 45 minutes before removing. Cure for 2-3 days before first use.', tags: ['Cost Saving', 'Studio Setup'] }
   ]));
 
-  const [guilds, setGuilds] = useState(() => storage.get('guilds', [
-    { id: '1', name: 'Wellington Potters Guild', members: 24, memberList: ['Hannah', 'Sarah', 'Mike'], location: 'Wellington, NZ', description: 'Weekly throws and quarterly exhibitions', isMember: true, isAdmin: true, event: 'Wood Firing Workshop - Jan 25', posts: [{ id: '1', author: 'Sarah', content: 'Anyone interested in a group wood firing next month?', time: '2 hours ago' }], resources: [{ id: '1', title: 'Studio Safety Guidelines', type: 'PDF', addedBy: 'Admin' }], inviteCode: 'WPG2026' },
-    { id: '2', name: 'Auckland Clay Collective', members: 18, memberList: [], location: 'Auckland, NZ', description: 'Community studio for all skill levels', isMember: false, isAdmin: false, event: null, posts: [], resources: [], inviteCode: 'ACC2026' }
-  ]));
+  const [guilds, setGuilds] = useState(() => storage.get('guilds', []));
+
+  // One-time cleanup: remove legacy default guilds
+  useEffect(() => {
+    if (!storage.get('guilds_cleaned')) {
+      setGuilds(prev => prev.filter(g => g.id !== '1' && g.id !== '2'));
+      storage.set('guilds_cleaned', true);
+    }
+  }, []);
 
   // Load projects from Supabase when authenticated
   useEffect(() => {
@@ -79,7 +88,10 @@ function CoastalKilnApp() {
             notes: (p.notes || []).reduce((acc, n) => ({ ...acc, [n.stage]: n.content }), {}),
             glazeIds: p.glaze_ids || [],
           }));
-          setProjects(transformed);
+          // Only replace templates if user has real data
+          if (transformed.length > 0) {
+            setProjects(transformed);
+          }
         } catch (error) {
           if (error.name === 'AbortError' && retries > 0) {
             console.log(`🔄 Retrying loadProjects (${retries} left)...`);
@@ -129,7 +141,10 @@ function CoastalKilnApp() {
               storage_path: t.storage_path,
             })),
           }));
-          setGlazes(transformed);
+          // Only replace templates if user has real data
+          if (transformed.length > 0) {
+            setGlazes(transformed);
+          }
         } catch (error) {
           if (error.name === 'AbortError' && retries > 0) {
             console.log(`🔄 Retrying loadGlazes (${retries} left)...`);
@@ -1497,7 +1512,7 @@ function CoastalKilnApp() {
                           }
                         }
 
-                        setProjects([{
+                        setProjects(prev => [{
                           id: newProject.id,
                           title: newProject.title,
                           clay: newProject.clay_body,
@@ -1507,10 +1522,10 @@ function CoastalKilnApp() {
                           notes: {},
                           glazeIds: form.pieceGlazes,
                           customGlaze: form.customGlaze
-                        }, ...projects]);
+                        }, ...prev.filter(p => p.id !== 'template')]);
                       } else {
                         console.log('🏺 Using localStorage to create project');
-                        setProjects([{ id: Date.now().toString(), title: form.title, clay: form.clay, stage: form.pieceStage, date: new Date().toISOString().split('T')[0], photos: form.photo ? [{ id: Date.now().toString(), url: form.photo }] : [], notes: {}, glazeIds: form.pieceGlazes, customGlaze: form.customGlaze }, ...projects]);
+                        setProjects(prev => [{ id: Date.now().toString(), title: form.title, clay: form.clay, stage: form.pieceStage, date: new Date().toISOString().split('T')[0], photos: form.photo ? [{ id: Date.now().toString(), url: form.photo }] : [], notes: {}, glazeIds: form.pieceGlazes, customGlaze: form.customGlaze }, ...prev.filter(p => p.id !== 'template')]);
                       }
                       setForm({ title: '', clay: '', name: '', type: '', recipe: '', photo: null, photoFile: null, weight: '', source: '', batchNotes: '', tipCategory: 'clay_reclaim', tipTitle: '', tipContent: '', tipTags: [], guildName: '', guildLocation: '', guildDesc: '', inviteCode: '', guildPost: '', resourceTitle: '', resourceType: 'PDF', resourceUrl: '', resourceFile: null, feedback: '', pieceStage: 'wedging', pieceGlazes: [], customGlaze: '' });
                       setShowModal(false);
@@ -1555,17 +1570,17 @@ function CoastalKilnApp() {
                         console.log('🎨 Using Supabase to create glaze, user.id:', user?.id);
                         const newGlaze = await glazesApi.create({ name: form.name, type: form.type, recipe: form.recipe, notes: '' }, user?.id);
                         console.log('🎨 Glaze created:', newGlaze);
-                        setGlazes([{
+                        setGlazes(prev => [{
                           id: newGlaze.id,
                           name: newGlaze.name,
                           type: newGlaze.firing_type,
                           recipe: newGlaze.recipe || '',
                           notes: newGlaze.notes || '',
                           tiles: []
-                        }, ...glazes]);
+                        }, ...prev.filter(g => g.id !== 'template')]);
                       } else {
                         console.log('🎨 Using localStorage to create glaze');
-                        setGlazes([{ id: Date.now().toString(), name: form.name, type: form.type, recipe: form.recipe, notes: '', tiles: [] }, ...glazes]);
+                        setGlazes(prev => [{ id: Date.now().toString(), name: form.name, type: form.type, recipe: form.recipe, notes: '', tiles: [] }, ...prev.filter(g => g.id !== 'template')]);
                       }
                       setForm({ title: '', clay: '', name: '', type: '', recipe: '', photo: null, photoFile: null, weight: '', source: '', batchNotes: '', tipCategory: 'clay_reclaim', tipTitle: '', tipContent: '', tipTags: [], guildName: '', guildLocation: '', guildDesc: '', inviteCode: '', guildPost: '', resourceTitle: '', resourceType: 'PDF', resourceUrl: '', resourceFile: null, feedback: '', pieceStage: 'wedging', pieceGlazes: [], customGlaze: '' });
                       setShowModal(false);
