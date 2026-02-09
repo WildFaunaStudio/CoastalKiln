@@ -1522,10 +1522,10 @@ function CoastalKilnApp() {
                           notes: {},
                           glazeIds: form.pieceGlazes,
                           customGlaze: form.customGlaze
-                        }, ...prev.filter(p => p.id !== 'template')]);
+                        }, ...prev]);
                       } else {
                         console.log('🏺 Using localStorage to create project');
-                        setProjects(prev => [{ id: Date.now().toString(), title: form.title, clay: form.clay, stage: form.pieceStage, date: new Date().toISOString().split('T')[0], photos: form.photo ? [{ id: Date.now().toString(), url: form.photo }] : [], notes: {}, glazeIds: form.pieceGlazes, customGlaze: form.customGlaze }, ...prev.filter(p => p.id !== 'template')]);
+                        setProjects(prev => [{ id: Date.now().toString(), title: form.title, clay: form.clay, stage: form.pieceStage, date: new Date().toISOString().split('T')[0], photos: form.photo ? [{ id: Date.now().toString(), url: form.photo }] : [], notes: {}, glazeIds: form.pieceGlazes, customGlaze: form.customGlaze }, ...prev]);
                       }
                       setForm({ title: '', clay: '', name: '', type: '', recipe: '', photo: null, photoFile: null, weight: '', source: '', batchNotes: '', tipCategory: 'clay_reclaim', tipTitle: '', tipContent: '', tipTags: [], guildName: '', guildLocation: '', guildDesc: '', inviteCode: '', guildPost: '', resourceTitle: '', resourceType: 'PDF', resourceUrl: '', resourceFile: null, feedback: '', pieceStage: 'wedging', pieceGlazes: [], customGlaze: '' });
                       setShowModal(false);
@@ -1577,10 +1577,10 @@ function CoastalKilnApp() {
                           recipe: newGlaze.recipe || '',
                           notes: newGlaze.notes || '',
                           tiles: []
-                        }, ...prev.filter(g => g.id !== 'template')]);
+                        }, ...prev]);
                       } else {
                         console.log('🎨 Using localStorage to create glaze');
-                        setGlazes(prev => [{ id: Date.now().toString(), name: form.name, type: form.type, recipe: form.recipe, notes: '', tiles: [] }, ...prev.filter(g => g.id !== 'template')]);
+                        setGlazes(prev => [{ id: Date.now().toString(), name: form.name, type: form.type, recipe: form.recipe, notes: '', tiles: [] }, ...prev]);
                       }
                       setForm({ title: '', clay: '', name: '', type: '', recipe: '', photo: null, photoFile: null, weight: '', source: '', batchNotes: '', tipCategory: 'clay_reclaim', tipTitle: '', tipContent: '', tipTags: [], guildName: '', guildLocation: '', guildDesc: '', inviteCode: '', guildPost: '', resourceTitle: '', resourceType: 'PDF', resourceUrl: '', resourceFile: null, feedback: '', pieceStage: 'wedging', pieceGlazes: [], customGlaze: '' });
                       setShowModal(false);
