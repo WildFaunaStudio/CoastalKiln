@@ -172,16 +172,17 @@ function CoastalKilnApp() {
 
   const [form, setForm] = useState({ title: '', clay: '', name: '', type: '', recipe: '', photo: null, photoFile: null, weight: '', source: '', batchNotes: '', tipCategory: 'clay_reclaim', tipTitle: '', tipContent: '', tipTags: [], guildName: '', guildLocation: '', guildDesc: '', inviteCode: '', guildPost: '', resourceTitle: '', resourceType: 'PDF', resourceUrl: '', resourceFile: null, feedback: '', pieceStage: 'wedging', pieceGlazes: [], customGlaze: '' });
 
-  const stages = ['wedging', 'throwing', 'trimming', 'drying', 'bisque', 'glazing', 'firing', 'complete'];
+  const stages = ['wedging', 'throwing', 'trimming', 'drying', 'leather_hard', 'bisque_fired', 'glazing', 'glaze_fired', 'complete'];
 
   const stageColors = {
     wedging: 'bg-amber-100 text-amber-800', throwing: 'bg-orange-100 text-orange-800',
     trimming: 'bg-yellow-100 text-yellow-800', drying: 'bg-lime-100 text-lime-800',
-    bisque: 'bg-cyan-100 text-cyan-800', glazing: 'bg-pink-100 text-pink-800',
-    firing: 'bg-purple-100 text-purple-800', complete: 'bg-green-100 text-green-800'
+    leather_hard: 'bg-teal-100 text-teal-800', bisque_fired: 'bg-cyan-100 text-cyan-800',
+    glazing: 'bg-pink-100 text-pink-800', glaze_fired: 'bg-purple-100 text-purple-800',
+    complete: 'bg-green-100 text-green-800'
   };
 
-  const formatStage = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+  const formatStage = (s) => s.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 
   const nextStage = (current) => {
     const idx = stages.indexOf(current);
@@ -1407,9 +1408,10 @@ function CoastalKilnApp() {
                     <option value="throwing">Throwing</option>
                     <option value="trimming">Trimming</option>
                     <option value="drying">Drying</option>
-                    <option value="bisque">Bisque</option>
+                    <option value="leather_hard">Leather Hard</option>
+                    <option value="bisque_fired">Bisque Fired</option>
                     <option value="glazing">Glazing</option>
-                    <option value="firing">Firing</option>
+                    <option value="glaze_fired">Glaze Fired</option>
                     <option value="complete">Complete</option>
                   </select>
                 </div>

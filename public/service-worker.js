@@ -1,4 +1,4 @@
-const CACHE_NAME = 'coastal-kiln-v1';
+const CACHE_NAME = 'coastal-kiln-v2';
 const urlsToCache = [
   '/',
   '/index.html',
