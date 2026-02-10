@@ -55,6 +55,29 @@ function CoastalKilnApp() {
 
   const [guilds, setGuilds] = useState(() => storage.get('guilds', []));
 
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [showInstallBanner, setShowInstallBanner] = useState(false);
+
+  // PWA install prompt
+  useEffect(() => {
+    const handleBeforeInstall = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setShowInstallBanner(true);
+      setTimeout(() => setShowInstallBanner(false), 15000);
+    };
+    const handleInstalled = () => {
+      setDeferredPrompt(null);
+      setShowInstallBanner(false);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+    window.addEventListener('appinstalled', handleInstalled);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+      window.removeEventListener('appinstalled', handleInstalled);
+    };
+  }, []);
+
   // One-time cleanup: remove legacy default guilds
   useEffect(() => {
     if (!storage.get('guilds_cleaned')) {
@@ -347,6 +370,20 @@ function CoastalKilnApp() {
                     <ChevronRight size={20} className="text-text-muted" />
                   </button>
 
+                  {deferredPrompt && (
+                    <button onClick={async () => {
+                      deferredPrompt.prompt();
+                      const { outcome } = await deferredPrompt.userChoice;
+                      if (outcome === 'accepted') {
+                        setDeferredPrompt(null);
+                        setShowInstallBanner(false);
+                      }
+                    }} className="w-full flex items-center justify-between p-4 bg-accent/10 border border-accent/30 rounded-2xl hover:bg-accent/20 transition-all">
+                      <span className="font-medium text-accent">Install App</span>
+                      <ChevronRight size={20} className="text-accent" />
+                    </button>
+                  )}
+
                   {/* Sign Out */}
                   <button
                     onClick={async () => {
@@ -486,6 +523,29 @@ function CoastalKilnApp() {
           </button>
         </div>
       </header>
+
+      {showInstallBanner && deferredPrompt && (
+        <div className="max-w-7xl mx-auto px-4 pt-2">
+          <div className="flex items-center justify-between gap-3 bg-accent/10 border border-accent/30 rounded-xl px-4 py-3">
+            <p className="text-sm font-medium text-text-primary">Install Coastal Kiln for quick access</p>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button onClick={async () => {
+                deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
+                if (outcome === 'accepted') {
+                  setDeferredPrompt(null);
+                  setShowInstallBanner(false);
+                }
+              }} className="px-3 py-1.5 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent-hover">
+                Install
+              </button>
+              <button onClick={() => setShowInstallBanner(false)} className="p-1 text-text-muted hover:text-text-primary">
+                <X size={18} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <main className="max-w-7xl mx-auto px-4 py-6 pb-32">
         {currentView === 'sustainable' && selectedBatch ? (
@@ -651,8 +711,15 @@ function CoastalKilnApp() {
                     {[...studioTips].sort((a, b) => (b.id || '').localeCompare(a.id || '')).map(tip => {
                       const categoryLabels = { clay_reclaim: 'Clay Reclaim', diy_tools: 'DIY Tools', plaster_bats: 'Plaster Bats', other: 'Other' };
                       return (
-                        <div key={tip.id} className="bg-white rounded-2xl p-4 shadow-sm">
-                          <div className="flex items-start justify-between mb-2">
+                        <div key={tip.id} className="bg-white rounded-2xl p-4 shadow-sm relative">
+                          <button onClick={() => {
+                            if (confirm('Are you sure you want to delete this tip?')) {
+                              setStudioTips(prev => prev.filter(t => t.id !== tip.id));
+                            }
+                          }} className="absolute top-2 right-2 p-1 text-text-muted hover:text-red-500">
+                            <X size={16} />
+                          </button>
+                          <div className="flex items-start justify-between mb-2 pr-6">
                             <h4 className="font-medium text-text-primary">{tip.title}</h4>
                             <span className="px-2 py-1 bg-nav-tips/20 text-nav-tips text-xs rounded-full font-medium">{categoryLabels[tip.category] || tip.category}</span>
                           </div>
@@ -690,8 +757,15 @@ function CoastalKilnApp() {
                           {expandedTips[category] && (
                             <div className="p-4 pt-0 space-y-3">
                               {categoryTips.map(tip => (
-                                <div key={tip.id} className="bg-white border border-stone-200 rounded-xl p-4">
-                                  <h4 className="font-medium text-text-primary mb-2">{tip.title}</h4>
+                                <div key={tip.id} className="bg-white border border-stone-200 rounded-xl p-4 relative">
+                                  <button onClick={() => {
+                                    if (confirm('Are you sure you want to delete this tip?')) {
+                                      setStudioTips(prev => prev.filter(t => t.id !== tip.id));
+                                    }
+                                  }} className="absolute top-2 right-2 p-1 text-text-muted hover:text-red-500">
+                                    <X size={16} />
+                                  </button>
+                                  <h4 className="font-medium text-text-primary mb-2 pr-6">{tip.title}</h4>
                                   <p className="text-sm text-text-secondary mb-3">{tip.content}</p>
                                   <div className="flex flex-wrap gap-2">
                                     {tip.tags.map((tag, idx) => (
@@ -1012,6 +1086,21 @@ function CoastalKilnApp() {
                 <h1 className="text-2xl font-bold text-text-primary">{selected.title}</h1>
                 <p className="text-sm text-text-secondary">{selected.clay}</p>
               </div>
+              <button onClick={async () => {
+                if (!confirm('Delete this piece?')) return;
+                try {
+                  if (isSupabaseConfigured() && !offlineMode) {
+                    await projectsApi.delete(selected.id);
+                  }
+                  setProjects(prev => prev.filter(p => p.id !== selected.id));
+                  setSelected(null);
+                } catch (error) {
+                  console.error('Error deleting piece:', error);
+                  alert('Failed to delete piece');
+                }
+              }} className="w-10 h-10 bg-red-600 text-white rounded-full hover:bg-red-700 flex items-center justify-center">
+                <Trash2 size={18} />
+              </button>
             </div>
 
             <div className="bg-white rounded-2xl border border-stone-200 p-6">
@@ -1091,6 +1180,21 @@ function CoastalKilnApp() {
                 <h1 className="text-2xl font-bold text-text-primary">{selected.name}</h1>
                 <p className="text-sm text-text-secondary">{selected.type}</p>
               </div>
+              <button onClick={async () => {
+                if (!confirm('Delete this glaze?')) return;
+                try {
+                  if (isSupabaseConfigured() && !offlineMode) {
+                    await glazesApi.delete(selected.id);
+                  }
+                  setGlazes(prev => prev.filter(g => g.id !== selected.id));
+                  setSelected(null);
+                } catch (error) {
+                  console.error('Error deleting glaze:', error);
+                  alert('Failed to delete glaze');
+                }
+              }} className="w-10 h-10 bg-red-600 text-white rounded-full hover:bg-red-700 flex items-center justify-center">
+                <Trash2 size={18} />
+              </button>
             </div>
 
             <div className="bg-white rounded-2xl border border-stone-200 p-6">

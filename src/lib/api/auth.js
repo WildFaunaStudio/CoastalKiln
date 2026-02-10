@@ -27,6 +27,7 @@ export const auth = {
         password,
         options: {
           data: { username },
+          emailRedirectTo: `${window.location.origin}`,
         },
       });
 

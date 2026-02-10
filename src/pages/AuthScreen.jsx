@@ -20,8 +20,7 @@ function AuthScreen({ onAuth, isOnline }) {
     try {
       if (mode === 'signup') {
         await onAuth.signUp(email, password, username);
-        setMessage('Check your email to confirm your account!');
-        setMode('signin');
+        setMode('confirm');
       } else if (mode === 'signin') {
         await onAuth.signIn(email, password);
       } else if (mode === 'forgot') {
@@ -59,6 +58,29 @@ function AuthScreen({ onAuth, isOnline }) {
             className="w-full px-6 py-3 bg-accent text-white rounded-xl font-semibold hover:bg-accent-hover transition-colors"
           >
             Continue Offline
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (mode === 'confirm') {
+    return (
+      <div className="min-h-screen bg-cream flex flex-col items-center justify-center p-6">
+        <div className="max-w-md w-full text-center">
+          <Mail className="w-16 h-16 mx-auto mb-4 text-accent" />
+          <h1 className="text-3xl font-bold text-text-primary mb-3">Check your inbox!</h1>
+          <p className="text-text-secondary mb-2">
+            We've sent a confirmation link to <strong>{email}</strong>. Click the link to activate your account.
+          </p>
+          <p className="text-sm text-text-muted mb-8">
+            Didn't receive it? Check your spam folder.
+          </p>
+          <button
+            onClick={() => { setMode('signin'); setError(null); setMessage(null); }}
+            className="px-6 py-3 bg-accent text-white rounded-xl font-semibold hover:bg-accent-hover transition-colors"
+          >
+            Back to Sign In
           </button>
         </div>
       </div>
